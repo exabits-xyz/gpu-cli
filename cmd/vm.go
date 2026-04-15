@@ -238,6 +238,64 @@ Omitting --duration returns all recorded data.`,
 	},
 }
 
+// ── vm start / stop / reboot ──────────────────────────────────────────────────
+
+// vmAction builds a command that calls GET /virtual-machines/{id}/<action>
+// and emits a simple {id, status, message} JSON object on success.
+func vmAction(action, short, long, statusWord string) *cobra.Command {
+	return &cobra.Command{
+		Use:   action + " <instance-id>",
+		Short: short,
+		Long:  long,
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			instanceID := args[0]
+
+			client, err := api.NewClient()
+			if err != nil {
+				exitAPIError(err)
+				return nil
+			}
+
+			if err := client.Get("/virtual-machines/"+instanceID+"/"+action, nil); err != nil {
+				exitAPIError(err)
+				return nil
+			}
+
+			printJSON(map[string]string{
+				"id":      instanceID,
+				"status":  statusWord,
+				"message": "virtual machine " + statusWord + " successfully",
+			})
+			return nil
+		},
+	}
+}
+
+var vmStartCmd = vmAction(
+	"start",
+	"Start a stopped VM instance",
+	"Initiates startup of the specified virtual machine.",
+	"starting",
+)
+
+var vmStopCmd = vmAction(
+	"stop",
+	"Stop a running VM instance",
+	`Shuts down the specified virtual machine.
+
+NOTE: The VM remains intact and continues to incur charges while stopped.
+      It can be restarted at any time. To release the instance entirely, use 'egpu vm delete'.`,
+	"stopping",
+)
+
+var vmRebootCmd = vmAction(
+	"reboot",
+	"Hard-reboot a VM instance",
+	"Performs a hard reboot of the specified virtual machine (equivalent to a physical power cycle).",
+	"rebooting",
+)
+
 // ── vm delete ─────────────────────────────────────────────────────────────────
 
 var deleteForce bool
@@ -309,6 +367,9 @@ func init() {
 	vmCmd.AddCommand(vmListCmd)
 	vmCmd.AddCommand(vmGetCmd)
 	vmCmd.AddCommand(vmCreateCmd)
+	vmCmd.AddCommand(vmStartCmd)
+	vmCmd.AddCommand(vmStopCmd)
+	vmCmd.AddCommand(vmRebootCmd)
 	vmCmd.AddCommand(vmMetricsCmd)
 	vmCmd.AddCommand(vmDeleteCmd)
 
