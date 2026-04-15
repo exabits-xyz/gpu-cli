@@ -1,0 +1,22 @@
+# Binary output
+egpu
+egpu.exe
+dist/
+
+# Config — never commit credentials
+.exabits/
+~/.exabits/
+
+# Go toolchain
+*.test
+*.out
+coverage.out
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
