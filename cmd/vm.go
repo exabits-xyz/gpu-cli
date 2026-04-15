@@ -159,6 +159,85 @@ Use --init-script to pass a bash script that runs at first boot (cloud-init).`,
 	},
 }
 
+// ── vm get ────────────────────────────────────────────────────────────────────
+
+var vmGetCmd = &cobra.Command{
+	Use:   "get <instance-id>",
+	Short: "Retrieve details of a VM instance",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		instanceID := args[0]
+
+		client, err := api.NewClient()
+		if err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		var vm types.VM
+		if err := client.Get("/virtual-machines/"+instanceID, &vm); err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		printJSON(vm)
+		return nil
+	},
+}
+
+// ── vm metrics ────────────────────────────────────────────────────────────────
+
+var metricsDuration string
+
+// validDurations is the full set accepted by the API.
+var validDurations = map[string]bool{
+	"1h": true, "2h": true, "4h": true, "6h": true, "12h": true,
+	"1d": true, "3d": true, "7d": true, "15d": true, "30d": true,
+}
+
+var vmMetricsCmd = &cobra.Command{
+	Use:   "metrics <instance-id>",
+	Short: "Retrieve CPU, memory, disk, and network metrics for a VM",
+	Long: `Fetches time-series performance metrics for the specified virtual machine.
+
+Use --duration to limit the window. Valid values:
+  1h  2h  4h  6h  12h  1d  3d  7d  15d  30d
+
+Omitting --duration returns all recorded data.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		instanceID := args[0]
+
+		if metricsDuration != "" && !validDurations[metricsDuration] {
+			exitInvalidArgs(fmt.Errorf(
+				"invalid --duration %q — valid values: 1h, 2h, 4h, 6h, 12h, 1d, 3d, 7d, 15d, 30d",
+				metricsDuration,
+			))
+			return nil
+		}
+
+		client, err := api.NewClient()
+		if err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		path := "/virtual-machines/" + instanceID + "/metrics"
+		if metricsDuration != "" {
+			path += "?duration=" + metricsDuration
+		}
+
+		var metrics types.VMMetrics
+		if err := client.Get(path, &metrics); err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		printJSON(metrics)
+		return nil
+	},
+}
+
 // ── vm delete ─────────────────────────────────────────────────────────────────
 
 var deleteForce bool
@@ -224,8 +303,13 @@ func init() {
 	// vm delete flags
 	vmDeleteCmd.Flags().BoolVar(&deleteForce, "force", false, "Confirm permanent deletion (required — all data will be erased)")
 
+	// vm metrics flags
+	vmMetricsCmd.Flags().StringVar(&metricsDuration, "duration", "", "Time window: 1h, 2h, 4h, 6h, 12h, 1d, 3d, 7d, 15d, 30d (default: all)")
+
 	vmCmd.AddCommand(vmListCmd)
+	vmCmd.AddCommand(vmGetCmd)
 	vmCmd.AddCommand(vmCreateCmd)
+	vmCmd.AddCommand(vmMetricsCmd)
 	vmCmd.AddCommand(vmDeleteCmd)
 
 	rootCmd.AddCommand(vmCmd)
