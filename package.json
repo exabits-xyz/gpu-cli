@@ -1,0 +1,29 @@
+{
+  "name": "@exabits/gpu-manager-skill",
+  "version": "1.0.0",
+  "description": "Agent Skills for Exabits GPU Cloud — automates provisioning, scheduling, and management of H100/H200/RTX GPU instances via the egpu CLI.",
+  "keywords": [
+    "agent-skills",
+    "agentskills",
+    "exabits",
+    "gpu",
+    "mcp",
+    "claude",
+    "cursor",
+    "openclaw"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/exabits/gpu-cli.git"
+  },
+  "files": [
+    "skills/"
+  ],
+  "scripts": {
+    "postinstall": "echo 'Exabits GPU Manager skill installed. Run: egpu mcp'"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

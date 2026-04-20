@@ -28,6 +28,12 @@ Built with [Cobra](https://github.com/spf13/cobra) and [Viper](https://github.co
   - [Stream Separation](#stream-separation)
   - [Exit Codes](#exit-codes)
   - [Auto-JSON Mode](#auto-json-mode)
+- [Agent Skills](#agent-skills)
+  - [How It Works](#how-it-works)
+  - [The Skill File](#the-skill-file)
+  - [Publish to npm](#publish-to-npm)
+  - [Install the Skill](#install-the-skill)
+  - [Supported Agents](#supported-agents)
 - [Development](#development)
   - [Dev Build](#dev-build)
   - [Debugging](#debugging)
@@ -546,6 +552,133 @@ This lets agents parse error messages with the same tooling they use for success
 
 ---
 
+## Agent Skills
+
+The `skills/exabits-gpu-manager/` directory contains an [Agent Skills](https://agentskills.io) package — a standardised way to give AI coding agents (Claude Code, Cursor, OpenClaw) **procedural knowledge** about how to use this CLI and its MCP tools.
+
+Rather than discovering the tool surface by trial and error, an agent that has loaded this skill already knows:
+
+- Which MCP tools exist and in what order to call them
+- Which GPU tier to default to for a given workload
+- How to handle capacity errors without retrying blindly
+- That `delete_gpu_vm` requires explicit user confirmation before proceeding
+
+### How It Works
+
+```
+User prompt
+    │
+    ▼
+Agent reads SKILL.md          ← procedural knowledge: when to trigger,
+    │                            routing rules, error handling, guardrails
+    ▼
+Agent calls MCP tools          ← list_gpu_flavors → list_os_images → create_gpu_vm
+(via egpu mcp stdio server)
+    │
+    ▼
+Exabits GPU Cloud API
+```
+
+The skill file is loaded by the agent framework at session start (or on demand via `npx skills add`). It does not add any runtime dependency — it is pure markdown that the agent reads as context.
+
+### The Skill File
+
+**Location:** [`skills/exabits-gpu-manager/SKILL.md`](skills/exabits-gpu-manager/SKILL.md)
+
+**YAML frontmatter** declares the skill identity and a binary prerequisite check:
+
+```yaml
+---
+name: exabits-gpu-manager
+description: "Automates the deployment, scheduling, and management of Exabits GPU instances..."
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - exabits
+---
+```
+
+The `openclaw.requires.bins` field tells compatible agents to verify that the `exabits` (or `egpu`) binary is on `$PATH` before activating the skill, so the agent surfaces a helpful install prompt instead of silently failing.
+
+**Markdown body** is divided into six sections that mirror how a senior engineer would onboard a new team member to this tool:
+
+| Section | Purpose |
+|---|---|
+| When to Use | Intent triggers — which user phrases activate this skill |
+| Hardware Context | GPU tier table so the agent can reason about tradeoffs |
+| Expert Routing Rules | Named defaults (H200 for speed, RTX_PRO_6000 for cost) |
+| Standard Workflow | Ordered 5-step sequence to avoid region-mismatch errors |
+| Error Handling & Guardrails | CapacityError fallback chain; DESTRUCTIVE ACTION LOCK for deletions |
+| Authentication | Priority-ordered credential sources for non-interactive agent use |
+
+### Publish to npm
+
+The `package.json` at the root of this repo configures the skill for npm distribution. The `files` field ensures only the `skills/` directory is included in the published package — no Go source code or git history is shipped.
+
+```bash
+# Log in to npm (one-time)
+npm login
+
+# Publish (or bump the version first)
+npm version patch   # or minor / major
+npm publish --access public
+```
+
+The package will be available at `https://npmjs.com/package/@exabits/gpu-manager-skill`.
+
+To publish under a different scope or name, update the `name` field in [`package.json`](package.json) before publishing.
+
+### Install the Skill
+
+**Via the Agent Skills CLI** (recommended):
+
+```bash
+npx skills add @exabits/gpu-manager-skill
+```
+
+This downloads the package and copies `skills/exabits-gpu-manager/SKILL.md` into the agent's local skill store, making it available in all future sessions automatically.
+
+**Directly from this repository** (no npm publish needed):
+
+```bash
+npx skills add github:exabits/gpu-cli
+```
+
+**Manual installation** (copy the file yourself):
+
+```bash
+# Claude Code
+cp skills/exabits-gpu-manager/SKILL.md ~/.claude/skills/
+
+# Cursor / OpenClaw — place in your project root skills directory
+cp skills/exabits-gpu-manager/SKILL.md ./skills/
+```
+
+After installation, verify the skill is active:
+
+```bash
+npx skills list
+# exabits-gpu-manager   Automates the deployment, scheduling, and management...
+```
+
+### Supported Agents
+
+| Agent | Install method | Notes |
+|---|---|---|
+| **Claude Code** | `npx skills add` or copy to `~/.claude/skills/` | Skill is loaded at session start |
+| **Cursor** | Copy to project `skills/` directory | Loaded per-project |
+| **OpenClaw** | `npx skills add` | `requires.bins` check is enforced |
+
+For Claude Code specifically, you can also reference the skill inline without installing it:
+
+```bash
+# From within the project directory, Claude Code will discover skills/ automatically
+egpu mcp   # start the MCP server first, then open Claude Code
+```
+
+---
+
 ## Development
 
 ### Dev Build
@@ -986,23 +1119,40 @@ chmod +x egpu && sudo mv egpu /usr/local/bin/
 gpu-cli/
 ├── main.go                   # Entrypoint — calls cmd.Execute()
 ├── go.mod / go.sum
+├── package.json              # npm distribution config for Agent Skills
 │
 ├── cmd/
 │   ├── root.go               # Root Cobra command, Viper init, --json flag,
 │   │                         # printJSON / printError / exitAPIError / exitInvalidArgs
 │   ├── auth.go               # egpu auth login — MD5 hash, saveTokens / saveConfigKeys
-│   ├── vm.go                 # egpu vm list / create / delete
-│   └── token.go              # egpu token list / create / update / delete
+│   ├── vm.go                 # egpu vm list / create / get / start / stop / reboot /
+│   │                         # metrics / volume attach|detach / delete
+│   ├── token.go              # egpu token list / create / update / delete
+│   ├── mcp.go                # egpu mcp — MCP stdio server (list_gpu_flavors,
+│   │                         # list_os_images, create_gpu_vm, delete_gpu_vm,
+│   │                         # check_billing_balance)
+│   ├── volume.go             # egpu volume list / create / delete
+│   ├── resource.go           # egpu resource list — hardware flavors
+│   ├── billing.go            # egpu billing balance / usage / statement
+│   ├── key.go                # egpu key list / create / delete
+│   └── config.go             # egpu config show
 │
-└── internal/
-    ├── api/
-    │   └── client.go         # Authenticated HTTP client (Get / GetPaged / Post / Put / Delete)
-    │                         # + standalone Login() for the unauthenticated login endpoint
-    └── types/
-        ├── vm.go             # VM, VMLogin, VMFlavor, VMImage, VMRegion, VMListResult,
-        │                     # SSHKeyInput, CreateVMRequest, CreateVMResponse,
-        │                     # LoginRequest, LoginData
-        └── token.go          # APIToken, CreateTokenRequest, TokenListResult
+├── internal/
+│   ├── api/
+│   │   └── client.go         # Authenticated HTTP client (Get / GetPaged / Post / Put /
+│   │                         # Delete / DeleteParsed) + standalone Login()
+│   └── types/
+│       ├── vm.go             # VM, CreateVMRequest/Response, SSHKeyInput, …
+│       ├── token.go          # APIToken, CreateTokenRequest, TokenListResult
+│       ├── resource.go       # FlavorGroup, FlavorProduct, Image, Region
+│       ├── volume.go         # Volume, CreateVolumeRequest, AttachVolumesRequest, …
+│       ├── sshkey.go         # SSHKey
+│       ├── metrics.go        # VMMetrics
+│       └── billing.go        # CreditBalance, UsageRecord, Statement
+│
+└── skills/
+    └── exabits-gpu-manager/
+        └── SKILL.md          # Agent Skills — procedural knowledge for AI agents
 ```
 
 ### Key design points
