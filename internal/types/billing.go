@@ -36,10 +36,10 @@ type Statement struct {
 	ID           string  `json:"id"`
 	ResourceID   string  `json:"resource_id"`
 	ResourceType string  `json:"resource_type"` // "vm" | "volume"
-	Status       string  `json:"status"`         // "paid", etc.
-	StartedTime  int64   `json:"started_time"`   // Unix timestamp
-	DueTime      int64   `json:"due_time"`       // Unix timestamp
-	Type         string  `json:"type"`           // "lease_fee", etc.
+	Status       string  `json:"status"`        // "paid", etc.
+	StartedTime  int64   `json:"started_time"`  // Unix timestamp
+	DueTime      int64   `json:"due_time"`      // Unix timestamp
+	Type         string  `json:"type"`          // "lease_fee", etc.
 	Amount       float64 `json:"amount"`
 }
 
