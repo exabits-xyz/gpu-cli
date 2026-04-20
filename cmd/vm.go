@@ -402,6 +402,82 @@ var vmRebootCmd = vmAction(
 	"rebooting",
 )
 
+// ── vm volume (attach / detach) ───────────────────────────────────────────────
+
+var vmVolumeCmd = &cobra.Command{
+	Use:   "volume",
+	Short: "Attach or detach volumes on a VM instance",
+}
+
+var attachVolumeIDs []string
+
+var vmVolumeAttachCmd = &cobra.Command{
+	Use:   "attach <vm-id>",
+	Short: "Attach one or more volumes to a VM instance",
+	Long: `Attaches non-bootable volumes to the specified virtual machine.
+
+--volume-ids accepts a comma-separated list or can be repeated:
+  --volume-ids id1,id2
+  --volume-ids id1 --volume-ids id2`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		vmID := args[0]
+
+		if len(attachVolumeIDs) == 0 {
+			exitInvalidArgs(fmt.Errorf("--volume-ids is required"))
+			return nil
+		}
+
+		client, err := api.NewClient()
+		if err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		req := types.AttachVolumesRequest{VolumeIDs: attachVolumeIDs}
+		if err := client.Post("/virtual-machines/"+vmID+"/volumes", req, nil); err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		printJSON(map[string]any{
+			"vm_id":      vmID,
+			"volume_ids": attachVolumeIDs,
+			"message":    "volumes attached successfully",
+		})
+		return nil
+	},
+}
+
+var vmVolumeDetachCmd = &cobra.Command{
+	Use:   "detach <vm-id> <volume-id>",
+	Short: "Detach a volume from a VM instance",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 2 {
+			exitInvalidArgs(fmt.Errorf("requires exactly 2 arguments: <vm-id> <volume-id>"))
+		}
+		return nil
+	},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		vmID, volumeID := args[0], args[1]
+
+		client, err := api.NewClient()
+		if err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		var result types.DetachVolumeResponse
+		if err := client.DeleteParsed("/virtual-machines/"+vmID+"/volumes/"+volumeID, &result); err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		printJSON(result)
+		return nil
+	},
+}
+
 // ── vm delete ─────────────────────────────────────────────────────────────────
 
 var deleteForce bool
@@ -471,6 +547,12 @@ func init() {
 	// vm metrics flags
 	vmMetricsCmd.Flags().StringVar(&metricsDuration, "duration", "", "Time window: 1h, 2h, 4h, 6h, 12h, 1d, 3d, 7d, 15d, 30d (default: all)")
 
+	// vm volume flags
+	vmVolumeAttachCmd.Flags().StringSliceVar(&attachVolumeIDs, "volume-ids", nil, "Comma-separated volume IDs to attach (required)")
+
+	vmVolumeCmd.AddCommand(vmVolumeAttachCmd)
+	vmVolumeCmd.AddCommand(vmVolumeDetachCmd)
+
 	vmCmd.AddCommand(vmListCmd)
 	vmCmd.AddCommand(vmGetCmd)
 	vmCmd.AddCommand(vmCreateCmd)
@@ -478,6 +560,7 @@ func init() {
 	vmCmd.AddCommand(vmStopCmd)
 	vmCmd.AddCommand(vmRebootCmd)
 	vmCmd.AddCommand(vmMetricsCmd)
+	vmCmd.AddCommand(vmVolumeCmd)
 	vmCmd.AddCommand(vmDeleteCmd)
 
 	rootCmd.AddCommand(vmCmd)

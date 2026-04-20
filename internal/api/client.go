@@ -262,6 +262,12 @@ func (c *Client) Delete(path string) error {
 	return c.do(http.MethodDelete, path, nil, nil, nil)
 }
 
+// DeleteParsed performs a DELETE request and decodes the response data into dst.
+// Use this for DELETE endpoints that return a data payload (e.g. detach volume).
+func (c *Client) DeleteParsed(path string, dst any) error {
+	return c.do(http.MethodDelete, path, nil, dst, nil)
+}
+
 // Login performs the unauthenticated POST /authenticate/login request.
 // It is a package-level function (not a Client method) because no auth
 // headers are needed — this is the call that obtains the tokens.
