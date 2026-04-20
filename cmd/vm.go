@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/exabits/gpu-cli/internal/api"
 	"github.com/exabits/gpu-cli/internal/types"
@@ -86,6 +89,14 @@ Supported filter operators: contains, eq, ne, gt, lt`,
 
 // ── vm create ─────────────────────────────────────────────────────────────────
 
+const (
+	pollInterval   = 5 * time.Second
+	pollTimeout    = 10 * time.Minute
+	spinnerClearFmt = "\r%-60s\r" // overwrite + rewind without leaving stale chars
+)
+
+var spinnerFrames = []string{"|", "/", "-", "\\"}
+
 var (
 	createName         string
 	createImageID      string
@@ -93,6 +104,7 @@ var (
 	createSSHKeyName   string
 	createSSHPublicKey string
 	createInitScript   string
+	createNoWait       bool
 )
 
 var vmCreateCmd = &cobra.Command{
@@ -106,7 +118,8 @@ reject the request.
 The --ssh-public-key value is the full public key string, e.g.:
   ssh-ed25519 AAAAC3Nz... user@host
 
-Use --init-script to pass a bash script that runs at first boot (cloud-init).`,
+Use --init-script to pass a bash script that runs at first boot (cloud-init).
+Use --no-wait to return immediately after the create request without polling.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Validate all required flags up-front for a clear exit code 2.
@@ -154,9 +167,102 @@ Use --init-script to pass a bash script that runs at first boot (cloud-init).`,
 			return nil
 		}
 
-		printJSON(created)
+		// --no-wait: return the minimal create response and exit immediately.
+		if createNoWait {
+			printJSON(created)
+			return nil
+		}
+
+		// Poll until the VM reaches "running", streaming progress to stderr.
+		vm, err := pollVMUntilRunning(client, created.ID)
+		if err != nil {
+			exitAPIError(err)
+			return nil
+		}
+
+		printJSON(vm)
 		return nil
 	},
+}
+
+// pollVMUntilRunning polls GET /virtual-machines/{id} until status == "running"
+// or the 10-minute timeout is reached.
+//
+// Progress output goes to stderr so stdout remains pure JSON:
+//   • TTY stderr    — animated spinner with elapsed time (overwritten each tick)
+//   • Piped stderr  — one JSON object per poll for agent consumption
+func pollVMUntilRunning(client *api.Client, instanceID string) (*types.VM, error) {
+	start := time.Now()
+	deadline := start.Add(pollTimeout)
+	tty := stderrIsTTY()
+
+	for attempt := 0; time.Now().Before(deadline); attempt++ {
+		var vm types.VM
+		if err := client.Get("/virtual-machines/"+instanceID, &vm); err != nil {
+			// Tolerate the first few polls — the VM may not be queryable yet.
+			if attempt < 3 {
+				writePollProgress(tty, attempt, instanceID, "provisioning", time.Since(start))
+				time.Sleep(pollInterval)
+				continue
+			}
+			if tty {
+				fmt.Fprintf(os.Stderr, spinnerClearFmt, "")
+			}
+			return nil, fmt.Errorf("polling failed: %w", err)
+		}
+
+		elapsed := time.Since(start).Round(time.Second)
+
+		if vm.Status == "running" {
+			if tty {
+				fmt.Fprintf(os.Stderr, spinnerClearFmt, "")
+				fmt.Fprintf(os.Stderr, "✓ VM %s is running (%s)\n", instanceID, elapsed)
+			} else {
+				writeProgressJSON(instanceID, "running", elapsed)
+			}
+			return &vm, nil
+		}
+
+		writePollProgress(tty, attempt, instanceID, vm.Status, elapsed)
+		time.Sleep(pollInterval)
+	}
+
+	if tty {
+		fmt.Fprintf(os.Stderr, spinnerClearFmt, "")
+	}
+	return nil, fmt.Errorf(
+		"timeout: VM %s did not reach 'running' within %v", instanceID, pollTimeout,
+	)
+}
+
+// writePollProgress emits one progress tick to stderr.
+func writePollProgress(tty bool, attempt int, id, status string, elapsed time.Duration) {
+	if tty {
+		frame := spinnerFrames[attempt%len(spinnerFrames)]
+		fmt.Fprintf(os.Stderr, "\r%s  VM %s — %s (%s)...",
+			frame, id, status, elapsed)
+	} else {
+		writeProgressJSON(id, status, elapsed)
+	}
+}
+
+// writeProgressJSON emits a single-line JSON progress event to stderr.
+func writeProgressJSON(id, status string, elapsed time.Duration) {
+	enc := json.NewEncoder(os.Stderr)
+	_ = enc.Encode(map[string]string{
+		"id":      id,
+		"status":  status,
+		"elapsed": elapsed.Round(time.Second).String(),
+	})
+}
+
+// stderrIsTTY reports whether stderr is an interactive terminal.
+func stderrIsTTY() bool {
+	stat, err := os.Stderr.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
 }
 
 // ── vm get ────────────────────────────────────────────────────────────────────
@@ -357,6 +463,7 @@ func init() {
 	vmCreateCmd.Flags().StringVar(&createSSHKeyName, "ssh-key-name", "", "Name to assign to the SSH key (required)")
 	vmCreateCmd.Flags().StringVar(&createSSHPublicKey, "ssh-public-key", "", "Public key string, e.g. 'ssh-ed25519 AAAA...' (required)")
 	vmCreateCmd.Flags().StringVar(&createInitScript, "init-script", "", "Bash script to run at first boot (cloud-init, optional)")
+	vmCreateCmd.Flags().BoolVar(&createNoWait, "no-wait", false, "Return immediately after the create request without polling for 'running' status")
 
 	// vm delete flags
 	vmDeleteCmd.Flags().BoolVar(&deleteForce, "force", false, "Confirm permanent deletion (required — all data will be erased)")
