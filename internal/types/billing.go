@@ -1,8 +1,9 @@
 package types
 
 // CreditBalance is the data object returned by GET /billing/balance.
+// The API returns available credits keyed by currency (e.g. "USD").
 type CreditBalance struct {
-	Balance float64 `json:"balance"`
+	Available map[string]float64 `json:"available"`
 }
 
 // BillingResource is the resource info embedded in a UsageRecord.
