@@ -15,9 +15,9 @@ type FlavorProduct struct {
 	RegionID       string  `json:"region_id,omitempty"`
 	Price          float64 `json:"price"`
 	CPU            int     `json:"cpu"`
-	Disk           int     `json:"disk"`           // GB root disk
+	Disk           int     `json:"disk"`                // GB root disk
 	Ephemeral      int     `json:"ephemeral,omitempty"` // GB temporary disk
-	RAM            int     `json:"ram"`            // GB
+	RAM            int     `json:"ram"`                 // GB
 	GPU            string  `json:"gpu"`
 	GPUCount       int     `json:"gpu_count"`
 	Bandwidth      string  `json:"bandwidth,omitempty"`

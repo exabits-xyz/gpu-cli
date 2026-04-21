@@ -18,8 +18,8 @@ const (
 	defaultBaseURL  = "https://gpu-api.exabits.ai"
 	defaultBasePath = "/api/v1"
 
-	maxRetries  = 3
-	retryDelay  = 500 * time.Millisecond
+	maxRetries = 3
+	retryDelay = 500 * time.Millisecond
 )
 
 // authMode controls which authentication header scheme is used.

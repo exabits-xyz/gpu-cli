@@ -90,8 +90,8 @@ Supported filter operators: contains, eq, ne, gt, lt`,
 // ── vm create ─────────────────────────────────────────────────────────────────
 
 const (
-	pollInterval   = 5 * time.Second
-	pollTimeout    = 10 * time.Minute
+	pollInterval    = 5 * time.Second
+	pollTimeout     = 10 * time.Minute
 	spinnerClearFmt = "\r%-60s\r" // overwrite + rewind without leaving stale chars
 )
 
@@ -189,8 +189,8 @@ Use --no-wait to return immediately after the create request without polling.`,
 // or the 10-minute timeout is reached.
 //
 // Progress output goes to stderr so stdout remains pure JSON:
-//   • TTY stderr    — animated spinner with elapsed time (overwritten each tick)
-//   • Piped stderr  — one JSON object per poll for agent consumption
+//   - TTY stderr    — animated spinner with elapsed time (overwritten each tick)
+//   - Piped stderr  — one JSON object per poll for agent consumption
 func pollVMUntilRunning(client *api.Client, instanceID string) (*types.VM, error) {
 	start := time.Now()
 	deadline := start.Add(pollTimeout)

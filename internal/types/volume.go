@@ -12,7 +12,7 @@ type Volume struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
 	Bootable    bool   `json:"bootable"`
-	Status      string `json:"status"`       // creating, available, deleting, downloading, attaching, detaching, in-use
+	Status      string `json:"status"` // creating, available, deleting, downloading, attaching, detaching, in-use
 	SizeGB      int    `json:"size_gb"`
 	Description string `json:"description,omitempty"`
 	Region      string `json:"region"`

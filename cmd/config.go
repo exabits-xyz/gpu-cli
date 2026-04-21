@@ -16,7 +16,7 @@ var configCmd = &cobra.Command{
 // configKeyMap maps user-facing key names to the internal Viper/config-file key.
 // Both the alias (e.g. "api_key") and the canonical name are accepted for set/get.
 var configKeyMap = map[string]string{
-	"api_key":       "api_token",  // user-facing alias
+	"api_key":       "api_token", // user-facing alias
 	"api_token":     "api_token",
 	"api_url":       "api_url",
 	"access_token":  "access_token",
