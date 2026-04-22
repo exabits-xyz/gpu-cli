@@ -102,7 +102,7 @@ If the user's intent matches more than one workflow, ask one clarifying question
 
 Some requests can be handled directly with the CLI without loading a workflow. Load [references/cli.md](references/cli.md) and execute directly when the user's intent is a single, self-contained operation:
 
-- List available GPU hardware — `egpu resource list`
+- List available GPU hardware — `egpu flavor list`
 - Look up SSH keys on the account — `egpu key list`
 - Show the current CLI configuration — `egpu config show`
 - Search for a specific instance by name — `egpu vm list --filter '...'`

@@ -22,7 +22,7 @@ Estimated cost check before provisioning:
 
 ```bash
 # Get the hourly price of the target flavor
-egpu resource list | jq '[.[] | .products[] | select(.gpu == "H100") | {name: .name, price_per_hour: .price}]'
+egpu flavor list | jq '[.[] | .products[] | select(.gpu == "RTX-5090") | {name: .name, price_per_hour: .price}]'
 ```
 
 Multiply hourly price by expected hours to estimate total cost, then compare against the balance.
@@ -69,4 +69,4 @@ egpu vm list \
   | sort | uniq -c
 ```
 
-Then cross-reference with `egpu resource list` pricing to estimate the ongoing hourly spend.
+Then cross-reference with `egpu flavor list` pricing to estimate the ongoing hourly spend.

@@ -77,8 +77,8 @@ egpu vm create \
 | Flag | Required | Description |
 |---|---|---|
 | `--name` | Yes | VM name, unique within your account |
-| `--image-id` | Yes | OS image ID (obtain from `egpu resource list`) |
-| `--flavor-id` | Yes | Hardware flavor ID (obtain from `egpu resource list`) |
+| `--image-id` | Yes | OS image ID (obtain from `egpu image list`) |
+| `--flavor-id` | Yes | Hardware flavor ID (obtain from `egpu flavor list`) |
 | `--ssh-key-name` | Yes | Label to assign to the SSH key |
 | `--ssh-public-key` | Yes | Full public key string, e.g. `ssh-ed25519 AAAA... user@host` |
 | `--init-script` | No | Bash script executed at first boot (cloud-init) |
@@ -193,15 +193,15 @@ egpu vm delete <instance-id> --force
 
 ---
 
-## egpu resource
+## egpu flavor
 
-### `egpu resource list`
+### `egpu flavor list`
 
 List all available GPU hardware flavors grouped by region, including stock availability and hourly price.
 
 ```bash
-egpu resource list
-egpu resource list | jq '[.[] | .products[] | select(.stock_available == true)]'
+egpu flavor list
+egpu flavor list | jq '[.[] | .products[] | select(.stock_available == true)]'
 ```
 
 Each product includes: `id`, `name`, `gpu`, `gpu_count`, `cpu`, `ram`, `disk`, `price`, `stock_available`, `region_name`.

@@ -37,7 +37,7 @@ If the balance is low or zero, inform the user and stop. Do not proceed to provi
 ### 2. Discover available hardware
 
 ```bash
-egpu resource list
+egpu flavor list
 ```
 
 - If the user did not specify a GPU, apply the routing rules in the Hardware Context table above.
@@ -47,7 +47,7 @@ egpu resource list
 ### 3. Discover available OS images in the same region
 
 ```bash
-egpu resource list | jq '[.[] | select(.region == "<region_name>") | .products[0]]'
+egpu flavor list | jq '[.[] | select(.region == "<region_name>") | .products[0]]'
 ```
 
 Or use the MCP tool `list_os_images` and filter by `region_name`.
@@ -101,7 +101,7 @@ If `egpu vm create` returns a capacity or stock error:
 1. **Do not retry the same flavor.**
 2. Inform the user: "The requested GPU tier is currently out of stock."
 3. Apply the fallback chain: H200 → H100 → RTX_PRO_6000
-4. Re-run `egpu resource list`, filter `stock_available: true`, present alternatives, and wait for user confirmation before proceeding.
+4. Re-run `egpu flavor list`, filter `stock_available: true`, present alternatives, and wait for user confirmation before proceeding.
 
 ### Billing error
 
@@ -112,5 +112,5 @@ If creation fails with a billing error:
 ### Region mismatch
 
 If the API returns a region mismatch error:
-1. Re-run `egpu resource list` and confirm `region_name` on both the flavor and the image.
+1. Re-run `egpu flavor list` and confirm `region_name` on both the flavor and the image.
 2. Re-run the create command with a corrected `image_id` that shares the same region as the `flavor_id`.

@@ -1132,7 +1132,7 @@ gpu-cli/
 │   │                         # list_os_images, create_gpu_vm, delete_gpu_vm,
 │   │                         # check_billing_balance)
 │   ├── volume.go             # egpu volume list / create / delete
-│   ├── resource.go           # egpu resource list — hardware flavors
+│   ├── resource.go           # egpu flavor / image / region list — hardware flavors / images / regions
 │   ├── billing.go            # egpu billing balance / usage / statement
 │   ├── key.go                # egpu key list / create / delete
 │   └── config.go             # egpu config show
