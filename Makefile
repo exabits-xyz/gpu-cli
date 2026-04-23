@@ -1,7 +1,7 @@
 default: build
 
 BINARY   := egpu
-MODULE   := github.com/exabits/gpu-cli
+MODULE   := github.com/exabits-xyz/gpu-cli
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS  := -ldflags "-X $(MODULE)/cmd.Version=$(VERSION)"
 

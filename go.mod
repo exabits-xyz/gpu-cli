@@ -1,4 +1,4 @@
-module github.com/exabits/gpu-cli
+module github.com/exabits-xyz/gpu-cli
 
 go 1.26.2
 

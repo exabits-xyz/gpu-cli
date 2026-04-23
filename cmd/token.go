@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/exabits/gpu-cli/internal/api"
-	"github.com/exabits/gpu-cli/internal/types"
+	"github.com/exabits-xyz/gpu-cli/internal/api"
+	"github.com/exabits-xyz/gpu-cli/internal/types"
 	"github.com/spf13/cobra"
 )
 

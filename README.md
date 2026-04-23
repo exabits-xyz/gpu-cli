@@ -55,7 +55,7 @@ Built with [Cobra](https://github.com/spf13/cobra) and [Viper](https://github.co
 
 ```bash
 # Clone and build
-git clone https://github.com/exabits/gpu-cli
+git clone https://github.com/exabits-xyz/gpu-cli
 cd gpu-cli
 go build -o egpu .
 
@@ -66,7 +66,7 @@ mv egpu /usr/local/bin/egpu
 Or install directly with `go install`:
 
 ```bash
-go install github.com/exabits/gpu-cli@latest
+go install github.com/exabits-xyz/gpu-cli@latest
 ```
 
 ---
@@ -642,7 +642,7 @@ This downloads the package and copies `skills/exabits-gpu-manager/SKILL.md` into
 **Directly from this repository** (no npm publish needed):
 
 ```bash
-npx skills add github:exabits/gpu-cli
+npx skills add github:exabits-xyz/gpu-cli
 ```
 
 **Manual installation** (copy the file yourself):
@@ -861,8 +861,8 @@ import (
     "net/http/httptest"
     "testing"
 
-    "github.com/exabits/gpu-cli/internal/api"
-    "github.com/exabits/gpu-cli/internal/types"
+    "github.com/exabits-xyz/gpu-cli/internal/api"
+    "github.com/exabits-xyz/gpu-cli/internal/types"
     "github.com/spf13/viper"
 )
 
@@ -1102,10 +1102,17 @@ jobs:
 #### Install a released binary (end-users)
 
 ```bash
-VERSION=v0.1.0
-ARCH=linux-amd64   # linux-arm64 | darwin-arm64 | darwin-amd64
+curl -fsSL https://raw.githubusercontent.com/exabits-xyz/gpu-cli/main/install.sh | sh
+```
 
-curl -L "https://github.com/exabits/gpu-cli/releases/download/${VERSION}/exabits_${VERSION}_${ARCH}.tar.gz" \
+Or manually for a specific version:
+
+```bash
+VERSION=v1.0.0
+OS=linux    # linux | darwin
+ARCH=amd64  # amd64 | arm64
+
+curl -L "https://github.com/exabits-xyz/gpu-cli/releases/download/${VERSION}/egpu_${OS}_${ARCH}.tar.gz" \
   | tar xz egpu
 
 chmod +x egpu && sudo mv egpu /usr/local/bin/

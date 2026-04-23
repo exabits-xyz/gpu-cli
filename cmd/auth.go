@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/exabits/gpu-cli/internal/api"
+	"github.com/exabits-xyz/gpu-cli/internal/api"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"

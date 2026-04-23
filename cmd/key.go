@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/exabits/gpu-cli/internal/types"
+	"github.com/exabits-xyz/gpu-cli/internal/types"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 )

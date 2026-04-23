@@ -9,13 +9,13 @@ Reference for installing the `egpu` CLI and configuring credentials for the Exab
 ### Option A — Homebrew (macOS / Linux, recommended)
 
 ```bash
-brew install exabits/tap/egpu
+brew install exabits-xyz/gpu-cli-tap/egpu
 ```
 
 ### Option B — `go install` (requires Go 1.21+)
 
 ```bash
-go install github.com/exabits/gpu-cli@latest
+go install github.com/exabits-xyz/gpu-cli@latest
 ```
 
 The binary is placed in `$(go env GOPATH)/bin`. Make sure that directory is on your `$PATH`:
@@ -27,19 +27,19 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 ### Option C — Pre-built binary (no Go required)
 
 ```bash
-VERSION=v1.0.0
-ARCH=linux-amd64   # linux-arm64 | darwin-arm64 | darwin-amd64 | windows-amd64
+curl -fsSL https://raw.githubusercontent.com/exabits-xyz/gpu-cli/main/install.sh | sh
+```
 
-curl -L "https://github.com/exabits/gpu-cli/releases/download/${VERSION}/exabits_${VERSION}_${ARCH}.tar.gz" \
-  | tar xz egpu
+Or install a specific version:
 
-chmod +x egpu && sudo mv egpu /usr/local/bin/
+```bash
+VERSION=v1.0.0 curl -fsSL https://raw.githubusercontent.com/exabits-xyz/gpu-cli/main/install.sh | sh
 ```
 
 ### Option D — Build from source
 
 ```bash
-git clone https://github.com/exabits/gpu-cli
+git clone https://github.com/exabits-xyz/gpu-cli
 cd gpu-cli
 go build -o egpu .
 sudo mv egpu /usr/local/bin/

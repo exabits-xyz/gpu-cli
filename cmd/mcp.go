@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/exabits/gpu-cli/internal/api"
-	"github.com/exabits/gpu-cli/internal/types"
+	"github.com/exabits-xyz/gpu-cli/internal/api"
+	"github.com/exabits-xyz/gpu-cli/internal/types"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/spf13/cobra"

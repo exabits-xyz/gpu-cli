@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/exabits/gpu-cli/internal/types"
+	"github.com/exabits-xyz/gpu-cli/internal/types"
 	"github.com/spf13/viper"
 )
 
