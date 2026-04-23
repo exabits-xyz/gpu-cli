@@ -41,20 +41,6 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
-brews:
-  - name: egpu
-    repository:
-      owner: exabits-xyz
-      name: homebrew-gpu-cli-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    homepage: "https://github.com/exabits-xyz/gpu-cli"
-    description: "Exabits GPU Cloud CLI"
-    license: "MIT"
-    install: |
-      bin.install "egpu"
-    test: |
-      system "#{bin}/egpu", "--version"
-
 release:
   github:
     owner: exabits-xyz

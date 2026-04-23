@@ -967,137 +967,60 @@ func TestVMDelete_NoForce_ExitsCode2(t *testing.T) {
 
 ### Release & Deploy
 
-#### Manual release
+#### Prerequisites
+
+Install [GoReleaser](https://goreleaser.com/install/):
 
 ```bash
-VERSION=v0.1.0
-COMMIT=$(git rev-parse --short HEAD)
-BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.buildDate=${BUILD_DATE}"
-
-mkdir -p dist
-GOOS=linux   GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/egpu-linux-amd64 .
-GOOS=linux   GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/egpu-linux-arm64 .
-GOOS=darwin  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/egpu-darwin-arm64 .
-GOOS=darwin  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/egpu-darwin-amd64 .
-GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/egpu-windows-amd64.exe .
-
-cd dist && sha256sum egpu-* > checksums.txt
+brew install goreleaser
+# or: go install github.com/goreleaser/goreleaser/v2@latest
 ```
 
-> `-s -w` strips the symbol table and DWARF debug info, shrinking the binary by ~30%.
-
-#### Automated releases with GoReleaser
+`GITHUB_TOKEN` is auto-fetched from the active `gh` CLI session via the Makefile — no manual export needed as long as you are logged in with an account that has push access to this repo:
 
 ```bash
-go install github.com/goreleaser/goreleaser/v2@latest
-# or: brew install goreleaser
+gh auth status   # verify the correct account is active
 ```
 
-`.goreleaser.yaml`:
-
-```yaml
-version: 2
-
-before:
-  hooks:
-    - go mod tidy
-    - go test ./...
-
-builds:
-  - env:
-      - CGO_ENABLED=0
-    goos: [linux, darwin, windows]
-    goarch: [amd64, arm64]
-    ignore:
-      - goos: windows
-        goarch: arm64
-    ldflags:
-      - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.buildDate={{.Date}}
-
-archives:
-  - formats: [tar.gz]
-    format_overrides:
-      - goos: windows
-        formats: [zip]
-    name_template: "exabits_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-
-checksum:
-  name_template: "checksums.txt"
-
-changelog:
-  sort: asc
-  filters:
-    exclude: ["^docs:", "^test:", "^chore:"]
-```
+#### Step 1 — Publish the release
 
 ```bash
-# Dry run
+make release version=v1.2.3
+```
+
+This tags the commit, builds binaries for all 5 platforms, and publishes the GitHub release with archives and `checksums.txt`:
+
+| Archive | Platform |
+|---|---|
+| `egpu_linux_amd64.tar.gz` | Linux x86-64 |
+| `egpu_linux_arm64.tar.gz` | Linux ARM64 |
+| `egpu_darwin_amd64.tar.gz` | macOS Intel |
+| `egpu_darwin_arm64.tar.gz` | macOS Apple Silicon |
+| `egpu_windows_amd64.zip` | Windows x86-64 |
+
+Pushing the tag also triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which runs the same GoReleaser pipeline in CI.
+
+#### Step 2 — Update the Homebrew formula
+
+After the release is live, update the tap repository:
+
+```bash
+cd ../homebrew-gpu-cli-tap
+./update-formula.sh 1.2.3
+git add Formula/egpu.rb
+git commit -m "egpu v1.2.3"
+git push
+```
+
+`update-formula.sh` fetches `checksums.txt` from the release and patches `Formula/egpu.rb` with the new version and SHA256 values for all platforms. Users running `brew upgrade egpu` will receive the update automatically.
+
+#### Dry run (no tag, no publish)
+
+```bash
 goreleaser build --snapshot --clean
-
-# Full release (requires GITHUB_TOKEN)
-git tag v0.1.0 && git push origin v0.1.0
-GITHUB_TOKEN=<token> goreleaser release --clean
 ```
 
-#### GitHub Actions
-
-`.github/workflows/release.yml`:
-
-```yaml
-name: Release
-on:
-  push:
-    tags: ["v*"]
-permissions:
-  contents: write
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - run: go test -race ./...
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-`.github/workflows/ci.yml`:
-
-```yaml
-name: CI
-on:
-  push:
-    branches: [main]
-  pull_request:
-jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-      - run: go build ./...
-      - run: go test -v -race -coverprofile=coverage.out ./...
-      - run: go tool cover -func=coverage.out
-```
+Builds all binaries into `dist/` without creating a tag or GitHub release — useful for verifying the build matrix locally.
 
 #### Install a released binary (end-users)
 
