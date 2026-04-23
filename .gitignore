@@ -1,3 +1,6 @@
+# Local env — never commit
+.env
+
 # Binary output
 egpu
 egpu.exe
