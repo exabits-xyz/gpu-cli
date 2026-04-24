@@ -595,7 +595,7 @@ metadata:
   openclaw:
     requires:
       bins:
-        - exabits
+        - egpu
 ---
 ```
 
