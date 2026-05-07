@@ -110,7 +110,7 @@ Config file location: `~/.exabits/config.yaml`
 | `api_token` | `EXABITS_API_TOKEN` | — | — | Long-lived API Token. When set, JWT fields are ignored. |
 | `access_token` | `EXABITS_ACCESS_TOKEN` | JWT mode | — | Short-lived JWT. Expires after 30 minutes. |
 | `refresh_token` | `EXABITS_REFRESH_TOKEN` | JWT mode | — | Refresh token. Expires after 2 hours. |
-| `api_url` | `EXABITS_API_URL` | No | `https://gpu-api.exabits.ai` | Override the API host (e.g. for staging). |
+| `api_url` | `EXABITS_API_URL` | No | `https://gpu-api.exascalelabs.ai` | Override the API host (e.g. for staging). |
 
 Auth precedence: `api_token` → `access_token` + `refresh_token`. Environment variables take precedence over the config file.
 

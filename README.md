@@ -1,6 +1,6 @@
 # egpu — GPU Cloud CLI
 
-A command-line interface for managing resources on the [Exabits GPU Cloud](https://gpu.exabits.ai/cloud) platform.
+A command-line interface for managing resources on the [Exascalelabs GPU Cloud](https://gpu.exascalelabs.ai) platform.
 
 Built with [Cobra](https://github.com/spf13/cobra) and [Viper](https://github.com/spf13/viper), and designed to be **Agent-Ready** — fully usable by AI coding agents (Claude Code, Cursor, etc.) without human intervention.
 
@@ -73,16 +73,26 @@ go install github.com/exabits-xyz/gpu-cli@latest
 
 ## Authentication
 
-The CLI supports two authentication methods. `api_token` takes precedence when both are present.
+The CLI supports browser authorization, API tokens, and legacy JWT login. Plain `api_token` takes precedence, then encrypted browser-auth tokens, then JWT tokens.
 
 | Method | Headers sent | Expiry |
 |---|---|---|
+| **API Token** (`api_token` or `api_token_encrypted`) | `Authorization: Bearer <api_token>` | Never |
 | **JWT** (`access_token` + `refresh_token`) | `Authorization: Bearer <access_token>` + `refresh-token: <refresh_token>` | 30 min / 2 h |
-| **API Token** (`api_token`) | `Authorization: Bearer <api_token>` | Never |
 
 All headers are injected automatically by the HTTP client on every request.
 
-### Option 1 — `egpu auth login` (quickest start)
+### Option 1 — `egpu auth` browser login (recommended)
+
+Run `egpu auth` without username/password. The CLI requests a one-time authorization state, opens your browser at `https://gpu.exascalelabs.ai/login?state=...`, waits while you log in and authorize on the web, then encrypts the returned API token locally.
+
+```bash
+egpu auth
+```
+
+Use `--no-browser` to print the URL without launching the system browser.
+
+### Option 2 — `egpu auth login` with username/password
 
 Run the login command with your Exabits account credentials. The password is MD5-hashed by the CLI before being sent — pass the plain-text value. On success, `access_token` and `refresh_token` are written to `~/.exabits/config.yaml`.
 
@@ -90,9 +100,9 @@ Run the login command with your Exabits account credentials. The password is MD5
 egpu auth login --username you@example.com --password yourpassword
 ```
 
-> Tokens expire: `access_token` after **30 minutes**, `refresh_token` after **2 hours**. Re-run `auth login` to refresh them, or use an API Token (see Option 3) to avoid expiry entirely.
+> Tokens expire: `access_token` after **30 minutes**, `refresh_token` after **2 hours**. Re-run `auth login` to refresh them, or use browser auth / an API Token to avoid expiry.
 
-### Option 2 — JWT tokens (config file / env vars)
+### Option 3 — JWT tokens (config file / env vars)
 
 Obtain tokens via the Exabits platform and write them to `~/.exabits/config.yaml`:
 
@@ -100,8 +110,8 @@ Obtain tokens via the Exabits platform and write them to `~/.exabits/config.yaml
 access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 refresh_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
-# Optional — defaults to https://gpu-api.exabits.ai
-# api_url: "https://gpu-api.exabits.ai"
+# Optional — defaults to https://gpu-api.exascalelabs.ai
+# api_url: "https://gpu-api.exascalelabs.ai"
 ```
 
 ```bash
@@ -117,7 +127,7 @@ export EXABITS_REFRESH_TOKEN="eyJ..."
 
 Environment variables take precedence over the config file.
 
-### Option 3 — API Token (never expires)
+### Option 4 — API Token (never expires)
 
 Generate a long-lived API Token with `egpu token create` or from the Exabits platform. Only a single header is required — no refresh cycle needed.
 
@@ -146,11 +156,13 @@ export EXABITS_API_TOKEN="eyJ..."
 | Key | Env var | Required | Default | Description |
 |---|---|---|---|---|
 | `api_token` | `EXABITS_API_TOKEN` | — | — | Long-lived API Token. When set, `access_token` and `refresh_token` are ignored. |
+| `api_token_encrypted` | `EXABITS_API_TOKEN_ENCRYPTED` | — | — | Encrypted API Token written by `egpu auth`. |
 | `access_token` | `EXABITS_ACCESS_TOKEN` | Yes (JWT mode) | — | Short-lived JWT. Expires after **30 minutes**. |
 | `refresh_token` | `EXABITS_REFRESH_TOKEN` | Yes (JWT mode) | — | JWT refresh token. Expires after **2 hours**. |
-| `api_url` | `EXABITS_API_URL` | No | `https://gpu-api.exabits.ai` | Override the API host (e.g. for staging). The `/api/v1` base path is appended automatically. |
+| `api_url` | `EXABITS_API_URL` | No | `https://gpu-api.exascalelabs.ai` | Override the API host (e.g. for staging). The `/api/v1` base path is appended automatically. |
+| `auth_url` | `EXABITS_AUTH_URL` | No | `https://gpu.exascalelabs.ai/login` | Override the browser login URL. |
 
-Auth precedence: `api_token` → `access_token` + `refresh_token`. Environment variables take precedence over the config file.
+Auth precedence: `api_token` → `api_token_encrypted` → `access_token` + `refresh_token`. Environment variables take precedence over the config file.
 
 ---
 
@@ -162,6 +174,20 @@ Auth precedence: `api_token` → `access_token` + `refresh_token`. Environment v
 |---|---|
 | `--json` | Force JSON output even in an interactive terminal |
 | `--help` | Show help for any command |
+
+---
+
+### `egpu auth`
+
+Start browser-based authentication and save the returned API token encrypted in `~/.exabits/config.yaml`.
+
+```
+egpu auth [--no-browser]
+```
+
+| Flag | Required | Description |
+|---|---|---|
+| `--no-browser` | No | Print the authorization URL without opening a browser |
 
 ---
 
@@ -1121,5 +1147,5 @@ In `cmd/vm.go`, define a new `*cobra.Command` and add it via `vmCmd.AddCommand(v
 ### Overriding the API base URL (staging/dev)
 
 ```bash
-EXABITS_API_URL=https://staging.gpu-api.exabits.ai egpu vm list
+EXABITS_API_URL=https://staging.gpu-api.exascalelabs.ai egpu vm list
 ```

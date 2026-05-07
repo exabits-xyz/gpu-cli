@@ -16,18 +16,21 @@ var configCmd = &cobra.Command{
 // configKeyMap maps user-facing key names to the internal Viper/config-file key.
 // Both the alias (e.g. "api_key") and the canonical name are accepted for set/get.
 var configKeyMap = map[string]string{
-	"api_key":       "api_token", // user-facing alias
-	"api_token":     "api_token",
-	"api_url":       "api_url",
-	"access_token":  "access_token",
-	"refresh_token": "refresh_token",
+	"api_key":             "api_token", // user-facing alias
+	"api_token":           "api_token",
+	"api_token_encrypted": "api_token_encrypted",
+	"api_url":             "api_url",
+	"auth_url":            "auth_url",
+	"access_token":        "access_token",
+	"refresh_token":       "refresh_token",
 }
 
 // sensitiveKeys are masked in `config show` and `config get` output.
 var sensitiveKeys = map[string]bool{
-	"api_token":     true,
-	"access_token":  true,
-	"refresh_token": true,
+	"api_token":           true,
+	"api_token_encrypted": true,
+	"access_token":        true,
+	"refresh_token":       true,
 }
 
 // maskValue shortens a sensitive string to first-6 … last-4 characters.
@@ -48,14 +51,16 @@ var configSetCmd = &cobra.Command{
 Existing keys in the file are preserved.
 
 Supported keys:
-  api_key       / api_token     — API Token for authentication (never expires)
-  api_url                       — Override the API base URL (default: https://gpu-api.exabits.ai)
+  api_key       / api_token     — API Token for authentication
+  api_token_encrypted           — Encrypted API token written by browser auth
+  api_url                       — Override the API base URL
+  auth_url                      — Override the browser login URL
   access_token                  — JWT access token  (expires 30 min)
   refresh_token                 — JWT refresh token (expires 2 h)
 
 Examples:
   egpu config set api_key    your-api-token
-  egpu config set api_url    https://staging.gpu-api.exabits.ai`,
+  egpu config set api_url    https://staging.gpu-api.exascalelabs.ai`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 2 {
 			exitInvalidArgs(fmt.Errorf("requires exactly 2 arguments: <key> <value>"))
@@ -68,7 +73,7 @@ Examples:
 		internalKey, ok := configKeyMap[strings.ToLower(userKey)]
 		if !ok {
 			exitInvalidArgs(fmt.Errorf(
-				"unknown config key %q — supported keys: api_key, api_url, access_token, refresh_token",
+				"unknown config key %q — supported keys: api_key, api_token_encrypted, api_url, auth_url, access_token, refresh_token",
 				userKey,
 			))
 			return nil
@@ -117,7 +122,7 @@ var configGetCmd = &cobra.Command{
 		internalKey, ok := configKeyMap[strings.ToLower(userKey)]
 		if !ok {
 			exitInvalidArgs(fmt.Errorf(
-				"unknown config key %q — supported keys: api_key, api_url, access_token, refresh_token",
+				"unknown config key %q — supported keys: api_key, api_token_encrypted, api_url, auth_url, access_token, refresh_token",
 				userKey,
 			))
 			return nil
@@ -159,7 +164,7 @@ Sensitive keys (api_token, access_token, refresh_token) are masked unless
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Collect all canonical keys in a deterministic order.
-		keys := []string{"api_token", "access_token", "refresh_token", "api_url"}
+		keys := []string{"api_token", "api_token_encrypted", "access_token", "refresh_token", "api_url", "auth_url"}
 
 		out := make(map[string]string, len(keys))
 		for _, k := range keys {
@@ -196,7 +201,7 @@ var configUnsetCmd = &cobra.Command{
 		internalKey, ok := configKeyMap[strings.ToLower(userKey)]
 		if !ok {
 			exitInvalidArgs(fmt.Errorf(
-				"unknown config key %q — supported keys: api_key, api_url, access_token, refresh_token",
+				"unknown config key %q — supported keys: api_key, api_token_encrypted, api_url, auth_url, access_token, refresh_token",
 				userKey,
 			))
 			return nil

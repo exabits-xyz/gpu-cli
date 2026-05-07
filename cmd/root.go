@@ -16,7 +16,7 @@ var rootCmd = &cobra.Command{
 	Use:   "egpu",
 	Short: "Exabits GPU Cloud CLI",
 	Long: `egpu is a command-line interface for managing resources on the
-Exabits GPU Cloud platform (gpu-api.exabits.ai).
+Exabits GPU Cloud platform (gpu-api.exascalelabs.ai).
 
 Configuration is read from ~/.exabits/config.yaml or via environment variables
 prefixed with EXABITS_ (e.g. EXABITS_ACCESS_TOKEN).`,

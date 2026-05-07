@@ -3,18 +3,80 @@ package cmd
 import (
 	"crypto/md5"
 	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
 
 	"github.com/exabits-xyz/gpu-cli/internal/api"
+	"github.com/exabits-xyz/gpu-cli/internal/securestore"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"
 )
 
+const (
+	deviceAuthPollInterval = 3 * time.Second
+)
+
+var authNoBrowser bool
+
 var authCmd = &cobra.Command{
 	Use:   "auth",
 	Short: "Authenticate with the Exabits API",
+	Long: `Starts browser-based authentication.
+
+The CLI requests an authorization state from the Exabits API, opens the login
+URL in your default browser, then polls until browser authorization succeeds.
+The returned API token is encrypted locally and saved in ~/.exabits/config.yaml.
+
+For the legacy username/password flow, use:
+  egpu auth login --username <user> --password <password>`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		baseURL := api.ResolveBaseURL(viper.GetString("api_url"))
+		start, err := api.RequestDeviceAuth(baseURL)
+		if err != nil {
+			exitAPIError(err)
+			return nil
+		}
+		if start.State == "" {
+			exitAPIError(fmt.Errorf("authorization response did not include state"))
+			return nil
+		}
+
+		loginURL := buildAuthURL(baseURL, start.State)
+		if !authNoBrowser {
+			if err := openBrowser(loginURL); err != nil {
+				fmt.Fprintf(os.Stderr, "Could not open browser automatically: %s\n", err)
+			}
+		}
+
+		fmt.Fprintf(os.Stderr, "Open this URL to authorize egpu:\n%s\n\n", loginURL)
+		fmt.Fprintf(os.Stderr, "Waiting for browser authorization")
+
+		token, err := pollDeviceAuth(baseURL, start.State, time.Duration(start.ExpiresIn)*time.Second)
+		if err != nil {
+			fmt.Fprintln(os.Stderr)
+			exitAPIError(err)
+			return nil
+		}
+		fmt.Fprintln(os.Stderr)
+
+		if err := saveEncryptedAPIToken(token); err != nil {
+			exitAPIError(fmt.Errorf("authorization succeeded but could not save token: %w", err))
+			return nil
+		}
+
+		printJSON(map[string]string{
+			"status":  "authenticated",
+			"message": "browser authorization successful — encrypted API token saved to ~/.exabits/config.yaml",
+		})
+		return nil
+	},
 }
 
 // ── auth login ────────────────────────────────────────────────────────────────
@@ -80,6 +142,17 @@ func saveTokens(accessToken, refreshToken string) error {
 	})
 }
 
+func saveEncryptedAPIToken(token string) error {
+	encrypted, err := securestore.EncryptToken(token)
+	if err != nil {
+		return err
+	}
+	return saveConfigKeys(map[string]any{
+		"api_token":           "",
+		"api_token_encrypted": encrypted,
+	})
+}
+
 // saveConfigKeys merges the given key-value pairs into ~/.exabits/config.yaml,
 // preserving all keys that are already present in the file.
 // The config directory is created with 0700 and the file is written with 0600.
@@ -118,7 +191,71 @@ func saveConfigKeys(values map[string]any) error {
 	return nil
 }
 
+func buildAuthURL(apiBaseURL, state string) string {
+	base := viper.GetString("auth_url")
+	if base == "" {
+		base = authURLFromAPIBase(apiBaseURL)
+	}
+	sep := "?"
+	if strings.Contains(base, "?") {
+		sep = "&"
+	}
+	return base + sep + "state=" + url.QueryEscape(state)
+}
+
+func authURLFromAPIBase(apiBaseURL string) string {
+	u, err := url.Parse(api.ResolveBaseURL(apiBaseURL))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		u, _ = url.Parse(api.DefaultBaseURL())
+	}
+	u.Host = strings.Replace(u.Host, "gpu-api.", "gpu.", 1)
+	u.Path = "/login"
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
+}
+
+func pollDeviceAuth(baseURL, state string, expiresIn time.Duration) (string, error) {
+	if expiresIn <= 0 {
+		expiresIn = 15 * time.Minute
+	}
+	deadline := time.Now().Add(expiresIn)
+	for time.Now().Before(deadline) {
+		time.Sleep(deviceAuthPollInterval)
+		fmt.Fprint(os.Stderr, ".")
+
+		data, ok, err := api.ValidateDeviceAuth(baseURL, state)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			continue
+		}
+		if data == nil || data.Token == "" {
+			return "", fmt.Errorf("authorization response did not include token")
+		}
+		return data.Token, nil
+	}
+	return "", fmt.Errorf("authorization timed out after %s", expiresIn.Round(time.Second))
+}
+
+func openBrowser(rawURL string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", rawURL)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", rawURL)
+	default:
+		cmd = exec.Command("xdg-open", rawURL)
+	}
+	return cmd.Start()
+}
+
 func init() {
+	authCmd.Flags().BoolVar(&authNoBrowser, "no-browser", false, "Print the browser authorization URL without opening it")
+
 	authLoginCmd.Flags().StringVar(&loginUsername, "username", "", "Exabits account username (required)")
 	authLoginCmd.Flags().StringVar(&loginPassword, "password", "", "Exabits account password, plain text — hashed with MD5 before sending (required)")
 
