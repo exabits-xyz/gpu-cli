@@ -1,6 +1,6 @@
 {
   "name": "@exabits/gpu-manager-skill",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Agent Skills for Exabits GPU Cloud — automates provisioning, scheduling, and management of H100/H200/RTX GPU instances via the egpu CLI.",
   "keywords": [
     "agent-skills",
