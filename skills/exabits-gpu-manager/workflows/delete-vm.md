@@ -6,6 +6,8 @@ Permanently terminate a GPU VM, release its resources, erase all data, and stop 
 
 Load [../references/cli.md](../references/cli.md) before running any commands.
 
+If MCP is available, use `list_gpu_vms`, `get_gpu_vm`, and `delete_gpu_vm`. The same confirmation lock applies before calling `delete_gpu_vm`.
+
 ---
 
 ## DESTRUCTIVE ACTION LOCK
@@ -55,7 +57,7 @@ egpu vm delete <instance-id> --force
 ### 5. Confirm deletion
 
 ```bash
-egpu vm list | jq '[.data[] | .id]'
+egpu vm list
 ```
 
 Verify the deleted instance ID is no longer present. Report to the user that the instance has been terminated and billing has stopped.

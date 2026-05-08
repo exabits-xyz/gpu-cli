@@ -1,364 +1,267 @@
-# CLI Reference
+# CLI and MCP Reference
 
-Full command reference for the `egpu` CLI. All commands emit pure JSON on stdout and write errors to stderr. Destructive commands require `--force`.
+Full reference for the `egpu` CLI and its built-in MCP server. CLI commands emit machine-parseable JSON on stdout and write errors/progress to stderr. Destructive CLI commands require `--force`.
 
 ---
 
-## Global Flags
+## Global Behavior
 
-| Flag | Description |
+| Item | Behavior |
 |---|---|
-| `--json` | Force JSON output even in an interactive terminal |
-| `--help` | Show help for any command |
+| Config | `~/.exabits/config.yaml` plus `EXABITS_*` environment variables |
+| Auth precedence | `api_token` -> `api_token_encrypted` -> `access_token` + `refresh_token` |
+| API host | `api_url`, default `https://gpu-api.exascalelabs.ai`; `/api/v1` is appended automatically |
+| JSON output | stdout is JSON; `--json` also makes errors JSON |
+| Piped output | stdout auto-detects non-TTY and stays JSON for agent/script use |
+
+Exit codes:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | API, network, auth, or internal error |
+| `2` | Invalid arguments |
 
 ---
 
-## egpu auth
+## Authentication and Config
+
+### `egpu auth`
+
+Browser-based login. Opens `auth_url` or derives `https://gpu.exascalelabs.ai/login?state=...`, then saves an encrypted API token to `~/.exabits/config.yaml`.
+
+```bash
+egpu auth [--no-browser]
+```
 
 ### `egpu auth login`
 
-Authenticate and save tokens to `~/.exabits/config.yaml`.
+Legacy username/password login. The CLI MD5-hashes the plaintext password before sending it and saves `access_token` plus `refresh_token`.
 
 ```bash
 egpu auth login --username <email> --password <plaintext-password>
 ```
 
-| Flag | Required | Description |
-|---|---|---|
-| `--username` | Yes | Exabits account email |
-| `--password` | Yes | Plain-text password (MD5-hashed by CLI before sending) |
+### `egpu config`
+
+```bash
+egpu config set <api_key|api_token|api_token_encrypted|api_url|auth_url|access_token|refresh_token> <value>
+egpu config get <key> [--show-full]
+egpu config show [--show-full]
+egpu config unset <key>
+```
+
+Sensitive values are masked unless `--show-full` is passed.
 
 ---
 
-## egpu vm
+## Discovery
 
-### `egpu vm list`
-
-List VM instances with optional pagination, sorting, and filtering.
+### Regions
 
 ```bash
-egpu vm list [flags]
+egpu region list
 ```
 
-| Flag | Type | Description |
-|---|---|---|
-| `--limit` | int | Max number of VMs to return |
-| `--offset` | int | Number of VMs to skip (pagination) |
-| `--sort-field` | string | Field to sort by: `name`, `status`, `started_time` |
-| `--sort-order` | string | `asc` or `desc` |
-| `--filter` | string | JSON filter array, e.g. `'[{"key":"name","op":"contains","val":"hub"}]'` |
+### GPU flavors
 
-Filter operators: `contains`, `eq`, `ne`, `gt`, `lt`
+List GPU hardware configurations grouped by region.
+
+```bash
+egpu flavor list [--region-id <region-id>]
+```
+
+Each product includes `id`, `name`, `region_id`, `region_name`, `gpu`, `gpu_count`, `cpu`, `ram`, `disk`, `price`, and `stock_available`.
+
+### OS images
+
+```bash
+egpu image list [--region-id <region-id>]
+```
+
+`image_id` and `flavor_id` used for VM creation must belong to the same region.
+
+---
+
+## VM Commands
+
+### List
+
+```bash
+egpu vm list [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-order asc|desc] [--filter '<json-array>']
+```
+
+Filter operators: `contains`, `eq`, `ne`, `gt`, `lt`.
+
+Examples:
 
 ```bash
 egpu vm list
-egpu vm list --limit 10 --sort-field name --sort-order asc
+egpu vm list --limit 10 --sort-field started_time --sort-order desc
 egpu vm list --filter '[{"key":"status","op":"eq","val":"running"}]'
-egpu vm list | jq '[.data[] | select(.status == "running") | .id]'
 ```
 
----
-
-### `egpu vm create`
-
-Provision a new GPU VM. `image_id` and `flavor_id` **must belong to the same region**.
+### Create
 
 ```bash
 egpu vm create \
   --name <string> \
-  --image-id <string> \
-  --flavor-id <string> \
-  --ssh-key-name <string> \
-  --ssh-public-key <string> \
-  [--init-script <string>] \
+  --image-id <image-id> \
+  --flavor-id <flavor-id> \
+  --ssh-key-name <label> \
+  --ssh-public-key <openssh-public-key> \
+  [--init-script <bash-script>] \
   [--no-wait]
 ```
 
-| Flag | Required | Description |
-|---|---|---|
-| `--name` | Yes | VM name, unique within your account |
-| `--image-id` | Yes | OS image ID (obtain from `egpu image list`) |
-| `--flavor-id` | Yes | Hardware flavor ID (obtain from `egpu flavor list`) |
-| `--ssh-key-name` | Yes | Label to assign to the SSH key |
-| `--ssh-public-key` | Yes | Full public key string, e.g. `ssh-ed25519 AAAA... user@host` |
-| `--init-script` | No | Bash script executed at first boot (cloud-init) |
-| `--no-wait` | No | Return immediately without polling for `running` status |
+By default, the command polls for up to 10 minutes until the VM reaches `running`, writing progress to stderr and returning the full VM object. `--no-wait` returns the initial `{id, name}` creation response.
 
-By default the command polls until the VM reaches `running` (up to 10 minutes) and streams progress to stderr.
-
-```bash
-egpu vm create \
-  --name training-run-01 \
-  --image-id 66b2d63c9e793247704c5a01 \
-  --flavor-id 66b9ca8f6523790d00fea3ca \
-  --ssh-key-name my-laptop \
-  --ssh-public-key "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host"
-```
-
-Returns `{id, name}`. Billing begins immediately.
-
----
-
-### `egpu vm get`
-
-Retrieve full details of a single VM instance.
+### Inspect and lifecycle
 
 ```bash
 egpu vm get <instance-id>
-```
-
----
-
-### `egpu vm start`
-
-Start a stopped VM instance.
-
-```bash
 egpu vm start <instance-id>
-```
-
----
-
-### `egpu vm stop`
-
-Stop a running VM. The VM remains intact and **continues to incur charges** while stopped.
-
-```bash
 egpu vm stop <instance-id>
-```
-
----
-
-### `egpu vm reboot`
-
-Hard-reboot a VM (equivalent to a physical power cycle).
-
-```bash
 egpu vm reboot <instance-id>
+egpu vm delete <instance-id> --force
 ```
 
----
+Stopping a VM does not stop billing. Deleting a VM is irreversible and stops VM billing after the instance is released.
 
-### `egpu vm metrics`
-
-Retrieve CPU, memory, disk, and network metrics.
+### Metrics
 
 ```bash
-egpu vm metrics <instance-id> [--duration <window>]
+egpu vm metrics <instance-id> [--duration 1h|2h|4h|6h|12h|1d|3d|7d|15d|30d]
 ```
 
-| Flag | Description |
-|---|---|
-| `--duration` | Time window: `1h` `2h` `4h` `6h` `12h` `1d` `3d` `7d` `15d` `30d` (default: all) |
+### VM volume attachment
 
 ```bash
-egpu vm metrics abc-123 --duration 1h
-```
-
----
-
-### `egpu vm volume attach`
-
-Attach one or more volumes to a running VM.
-
-```bash
-egpu vm volume attach <vm-id> --volume-ids <id1>[,<id2>...]
-```
-
-`--volume-ids` accepts a comma-separated list or can be repeated.
-
----
-
-### `egpu vm volume detach`
-
-Detach a volume from a VM.
-
-```bash
+egpu vm volume attach <vm-id> --volume-ids <volume-id>[,<volume-id>...]
+egpu vm volume attach <vm-id> --volume-ids <volume-id-1> --volume-ids <volume-id-2>
 egpu vm volume detach <vm-id> <volume-id>
 ```
 
 ---
 
-### `egpu vm delete`
+## Volume Commands
 
-**Irreversible.** Permanently deletes the VM, releases the server, erases all data, and stops billing. Requires `--force`.
-
-```bash
-egpu vm delete <instance-id> --force
-```
-
-| Flag | Required | Description |
-|---|---|---|
-| `--force` | Yes | Confirms permanent deletion — all data will be erased |
-
----
-
-## egpu flavor
-
-### `egpu flavor list`
-
-List all available GPU hardware flavors grouped by region, including stock availability and hourly price.
+### List
 
 ```bash
-egpu flavor list
-egpu flavor list | jq '[.[] | .products[] | select(.stock_available == true)]'
+egpu volume list [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-order asc|desc] [--filter '<json-array>']
 ```
 
-Each product includes: `id`, `name`, `gpu`, `gpu_count`, `cpu`, `ram`, `disk`, `price`, `stock_available`, `region_name`.
-
----
-
-## egpu volume
-
-### `egpu volume list`
-
-List block-storage volumes on your account.
+### Volume types
 
 ```bash
-egpu volume list
+egpu volume type list --region-id <region-id>
 ```
 
-### `egpu volume create`
-
-Create a new block-storage volume.
+### Create
 
 ```bash
-egpu volume create --name <string> --size <int> --region <string>
+egpu volume create \
+  --display-name <string> \
+  --region-id <region-id> \
+  --type-id <volume-type-id> \
+  --size <gb> \
+  [--image-id <image-id>] \
+  [--description <string>] \
+  [--payment-currency <currency>]
 ```
 
-### `egpu volume delete`
+`--display-name`, `--region-id`, `--type-id`, and `--size` are required. `--display-name` must be 50 characters or fewer.
 
-Permanently delete a volume. Requires `--force`.
+### Delete
 
 ```bash
 egpu volume delete <volume-id> --force
 ```
 
+Volume deletion is irreversible.
+
 ---
 
-## egpu billing
-
-### `egpu billing balance`
-
-Retrieve the current account credit balance.
+## Billing Commands
 
 ```bash
 egpu billing balance
+egpu billing usage [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-order asc|desc] [--filter '<json-array>']
+egpu billing statement [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-order asc|desc] [--filter '<json-array>']
 ```
 
-### `egpu billing usage`
-
-Retrieve resource usage records for the account.
-
-```bash
-egpu billing usage
-```
-
-### `egpu billing statement`
-
-Retrieve billing statements / invoices.
-
-```bash
-egpu billing statement
-```
+`billing balance` returns available credits keyed by currency, e.g. `{"available":{"USD":42.5}}`.
 
 ---
 
-## egpu token
-
-### `egpu token list`
-
-List API tokens.
+## API Token Commands
 
 ```bash
 egpu token list [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-order asc|desc]
-```
-
-### `egpu token create`
-
-Create a new never-expiring API token.
-
-```bash
 egpu token create --name <string> [--description <string>] [--save]
-```
-
-`--save` writes the token to `~/.exabits/config.yaml` and activates it immediately.
-
-> The full token value is only shown once at creation — copy it immediately.
-
-### `egpu token update`
-
-Update the name or description of a token.
-
-```bash
 egpu token update <token-id> --name <string> [--description <string>]
-```
-
-### `egpu token delete`
-
-Permanently delete a token. Requires `--force`.
-
-```bash
 egpu token delete <token-id> --force
 ```
 
+API tokens do not expire. `--save` writes the generated token to `~/.exabits/config.yaml` as `api_token` and makes it the active credential. The full token value is shown at creation time; store it securely.
+
 ---
 
-## egpu key
+## Local SSH Key Commands
 
-### `egpu key list`
-
-List SSH keys stored on your account.
+These commands manage local key pairs under `~/.exabits/keys`; they do not query remote account keys.
 
 ```bash
+egpu key generate --name <name>
 egpu key list
+egpu key delete <name> [--force]
 ```
+
+Generated private keys are written as `~/.exabits/keys/egpu_<name>` with mode `0600`; public keys are written as `~/.exabits/keys/egpu_<name>.pub`.
 
 ---
 
-## egpu config
+## MCP Server
 
-### `egpu config show`
-
-Display the current CLI configuration (active credential source, API URL).
-
-```bash
-egpu config show
-```
-
----
-
-## egpu mcp
-
-Start the MCP (Model Context Protocol) server over stdio. Exposes five tools to AI assistants:
-
-| Tool | Description |
-|---|---|
-| `list_gpu_flavors` | List all GPU hardware flavors with availability |
-| `list_os_images` | List all available OS images |
-| `create_gpu_vm` | Provision a new GPU VM |
-| `delete_gpu_vm` | Permanently delete a VM |
-| `check_billing_balance` | Retrieve the current account balance |
+Start the MCP server over stdio:
 
 ```bash
 egpu mcp
 ```
 
-Add to your AI assistant config — see [`workflows/setup-mcp.md`](../workflows/setup-mcp.md) for full instructions.
+The MCP server reads the same config and environment variables as the CLI. It writes startup diagnostics to stderr; stdout is reserved for JSON-RPC.
 
----
+### MCP tools
 
-## Exit Codes
+| Tool | CLI equivalent | Description |
+|---|---|---|
+| `list_regions` | `egpu region list` | List datacenter regions |
+| `list_gpu_flavors` | `egpu flavor list` | List GPU flavors; optional `region_id` |
+| `list_os_images` | `egpu image list` | List OS images; optional `region_id` |
+| `list_gpu_vms` | `egpu vm list` | List VMs with `limit`, `offset`, `sort_field`, `sort_order`, `filter` |
+| `get_gpu_vm` | `egpu vm get` | Get VM details |
+| `create_gpu_vm` | `egpu vm create` | Create VM; supports `init_script` and `wait_for_running` |
+| `start_gpu_vm` | `egpu vm start` | Start VM |
+| `stop_gpu_vm` | `egpu vm stop` | Stop VM; billing may continue |
+| `reboot_gpu_vm` | `egpu vm reboot` | Reboot VM |
+| `get_gpu_vm_metrics` | `egpu vm metrics` | Get VM metrics; optional `duration` |
+| `attach_volumes_to_gpu_vm` | `egpu vm volume attach` | Attach one or more volumes |
+| `detach_volume_from_gpu_vm` | `egpu vm volume detach` | Detach a volume |
+| `delete_gpu_vm` | `egpu vm delete --force` | Permanently delete a VM |
+| `list_volumes` | `egpu volume list` | List volumes with pagination/sort/filter |
+| `list_volume_types` | `egpu volume type list` | List volume types for `region_id` |
+| `create_volume` | `egpu volume create` | Create a volume |
+| `delete_volume` | `egpu volume delete --force` | Permanently delete a volume |
+| `check_billing_balance` | `egpu billing balance` | Get credit balance |
+| `get_billing_usage` | `egpu billing usage` | Get usage history |
+| `get_billing_statements` | `egpu billing statement` | Get billing statements |
+| `list_api_tokens` | `egpu token list` | List API tokens |
+| `create_api_token` | `egpu token create` | Create API token; optional `save` |
+| `update_api_token` | `egpu token update` | Update token metadata |
+| `delete_api_token` | `egpu token delete --force` | Delete API token |
+| `generate_ssh_key` | `egpu key generate` | Generate local SSH key pair |
+| `list_ssh_keys` | `egpu key list` | List local SSH keys |
+| `delete_ssh_key` | `egpu key delete --force` | Delete local SSH key pair |
 
-| Code | Meaning |
-|---|---|
-| `0` | Success |
-| `1` | API error or internal error (network, auth, unexpected response) |
-| `2` | Invalid arguments (missing required flags, wrong argument count) |
-
-## Output Format
-
-- **stdout** — pure JSON, always machine-parseable
-- **stderr** — errors as plain text (TTY) or JSON (non-TTY / `--json`)
-
-JSON mode activates automatically when stdout is piped or redirected, or when `--json` is passed.
+MCP clients do not pass CLI `--force`; destructive MCP tools are already non-interactive. The agent must ask the user for explicit confirmation before calling any destructive MCP tool.

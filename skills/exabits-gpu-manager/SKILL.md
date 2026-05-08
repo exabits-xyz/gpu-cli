@@ -25,7 +25,7 @@ Before running any workflow, verify the CLI is available and authenticated:
 
 ```bash
 egpu --help
-egpu auth login --help
+egpu billing balance
 ```
 
 If `egpu` is not installed or credentials are not configured, load [references/installation.md](references/installation.md) and stop until setup is complete.
@@ -33,6 +33,12 @@ If `egpu` is not installed or credentials are not configured, load [references/i
 ## CLI Reference
 
 Before running any `egpu` command, load [references/cli.md](references/cli.md) as the source of truth for exact flags, subcommands, and examples. Do not guess command syntax from memory.
+
+## MCP Usage
+
+When an Exabits MCP server is available, prefer MCP tools for normal cloud operations because they use the same API client without shell parsing. Still load [references/cli.md](references/cli.md) first to confirm exact tool names and argument shapes. Use CLI commands when the user asks for terminal commands, when MCP is not connected, or when debugging the local installation.
+
+Destructive MCP tools are non-interactive. Before calling `delete_gpu_vm`, `delete_volume`, `delete_api_token`, or `delete_ssh_key`, ask the user for explicit confirmation just as you would before passing `--force` to the CLI.
 
 ## Workflow Routing
 
@@ -54,6 +60,7 @@ Before running any `egpu` command, load [references/cli.md](references/cli.md) a
 - "Show metrics for my server" / "How much CPU/memory is my VM using?"
 - "Get details about instance [id]"
 - "I want to pause my VM without deleting it"
+- "Attach / detach storage to a VM" if the focus is VM lifecycle
 
 ---
 
@@ -103,6 +110,7 @@ If the user's intent matches more than one workflow, ask one clarifying question
 Some requests can be handled directly with the CLI without loading a workflow. Load [references/cli.md](references/cli.md) and execute directly when the user's intent is a single, self-contained operation:
 
 - List available GPU hardware — `egpu flavor list`
-- Look up SSH keys on the account — `egpu key list`
+- List local SSH keys — `egpu key list`
+- Generate a local SSH key — `egpu key generate --name <name>`
 - Show the current CLI configuration — `egpu config show`
 - Search for a specific instance by name — `egpu vm list --filter '...'`

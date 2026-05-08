@@ -7,6 +7,8 @@ Provision a new GPU virtual machine on Exabits GPU Cloud — from hardware selec
 Load [../references/cli.md](../references/cli.md) before running any commands.
 If credentials are missing, load [../references/installation.md](../references/installation.md) first.
 
+If MCP is available, prefer `check_billing_balance`, `list_gpu_flavors`, `list_os_images`, `list_ssh_keys`, `generate_ssh_key`, and `create_gpu_vm`. Use the CLI examples below when MCP is unavailable or the user asks for shell commands.
+
 ---
 
 ## Hardware Context
@@ -47,10 +49,10 @@ egpu flavor list
 ### 3. Discover available OS images in the same region
 
 ```bash
-egpu flavor list | jq '[.[] | select(.region == "<region_name>") | .products[0]]'
+egpu image list --region-id <region_id>
 ```
 
-Or use the MCP tool `list_os_images` and filter by `region_name`.
+Or use the MCP tool `list_os_images` with `region_id`.
 
 - Default to the latest **Ubuntu LTS** image unless the user specifies otherwise.
 - Pre-configured AI/ML images (e.g. `PyTorch`, `CUDA`) are available — prefer them for training/inference workloads.
@@ -64,7 +66,19 @@ Ask the user for their SSH public key if not already provided. The expected form
 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host
 ```
 
-You may also check `egpu key list` if the user has keys stored on the account.
+You may also check local keys:
+
+```bash
+egpu key list
+```
+
+If the user asks you to create a key, run:
+
+```bash
+egpu key generate --name <name>
+```
+
+Use the returned `public_key` with VM creation. Keep the private key path for the user's SSH command.
 
 ### 5. Provision the VM
 
@@ -80,6 +94,8 @@ egpu vm create \
 The command polls until the VM reaches `running` status (up to 10 minutes) and streams progress to stderr. The final output on stdout is the full VM detail object including `fixed_ip`.
 
 Pass `--no-wait` only if the user explicitly wants to return immediately.
+
+MCP equivalent: call `create_gpu_vm` with `name`, `image_id`, `flavor_id`, `ssh_key.name`, `ssh_key.public_key`, optional `init_script`, and `wait_for_running: true` unless the user wants asynchronous provisioning.
 
 ### 6. Report to the user
 

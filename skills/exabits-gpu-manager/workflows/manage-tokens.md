@@ -7,6 +7,8 @@ Create, list, update, and delete long-lived API tokens for the Exabits GPU Cloud
 Load [../references/cli.md](../references/cli.md) before running any commands.
 You must be authenticated with a valid session (JWT or existing API token) to manage tokens.
 
+If MCP is available, prefer `list_api_tokens`, `create_api_token`, `update_api_token`, and `delete_api_token`. Ask for explicit confirmation before calling `delete_api_token`.
+
 ---
 
 ## When to Use API Tokens
@@ -69,7 +71,7 @@ Permanently revokes the token. Any system using it will immediately lose API acc
 egpu token delete <token-id> --force
 ```
 
-`--force` is required. Confirm the correct token ID before proceeding — show the user the token name and description from `egpu token list` first.
+`--force` is required. Confirm the correct token ID before proceeding — show the user the token name and description from `egpu token list` first, then ask for explicit confirmation.
 
 ---
 

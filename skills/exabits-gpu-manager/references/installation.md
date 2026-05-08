@@ -55,16 +55,29 @@ egpu --help
 
 ## Authentication
 
-The CLI supports two credential types. `api_token` takes precedence when both are present.
+The CLI supports browser authorization, long-lived API tokens, and legacy JWT token pairs. `api_token` takes precedence, then `api_token_encrypted`, then the JWT pair.
 
 | Method | Headers sent | Expiry |
 |---|---|---|
 | **API Token** | `Authorization: Bearer <api_token>` | Never — preferred for agents and CI |
+| **Encrypted API Token** | `Authorization: Bearer <decrypted api_token_encrypted>` | Never — written by `egpu auth` |
 | **JWT pair** | `Authorization: Bearer <access_token>` + `refresh-token: <refresh_token>` | 30 min / 2 h |
 
 ---
 
-### Option 1 — Interactive login (quickest start)
+### Option 1 — Browser auth (recommended)
+
+```bash
+egpu auth
+```
+
+This opens a browser authorization URL and saves an encrypted API token to `~/.exabits/config.yaml`. Use `--no-browser` when running on a remote machine:
+
+```bash
+egpu auth --no-browser
+```
+
+### Option 2 — Username/password login
 
 ```bash
 egpu auth login --username you@example.com --password yourpassword
@@ -72,7 +85,7 @@ egpu auth login --username you@example.com --password yourpassword
 
 Saves `access_token` and `refresh_token` to `~/.exabits/config.yaml`. Tokens expire: access after **30 minutes**, refresh after **2 hours**.
 
-### Option 2 — Long-lived API Token (recommended for agents)
+### Option 3 — Long-lived API Token for agents
 
 ```bash
 # Log in first, then create and immediately activate a token
@@ -88,7 +101,7 @@ Or set it via environment variable (no config file needed):
 export EXABITS_API_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
-### Option 3 — Environment variables (CI / Docker)
+### Option 4 — Environment variables (CI / Docker)
 
 ```bash
 export EXABITS_API_TOKEN="eyJ..."                    # preferred
@@ -108,11 +121,13 @@ Config file location: `~/.exabits/config.yaml`
 | Key | Env var | Required | Default | Description |
 |---|---|---|---|---|
 | `api_token` | `EXABITS_API_TOKEN` | — | — | Long-lived API Token. When set, JWT fields are ignored. |
+| `api_token_encrypted` | `EXABITS_API_TOKEN_ENCRYPTED` | — | — | Encrypted API token written by browser auth. |
 | `access_token` | `EXABITS_ACCESS_TOKEN` | JWT mode | — | Short-lived JWT. Expires after 30 minutes. |
 | `refresh_token` | `EXABITS_REFRESH_TOKEN` | JWT mode | — | Refresh token. Expires after 2 hours. |
 | `api_url` | `EXABITS_API_URL` | No | `https://gpu-api.exascalelabs.ai` | Override the API host (e.g. for staging). |
+| `auth_url` | `EXABITS_AUTH_URL` | No | Derived from `api_url` | Override browser login URL. |
 
-Auth precedence: `api_token` → `access_token` + `refresh_token`. Environment variables take precedence over the config file.
+Auth precedence: `api_token` -> `api_token_encrypted` -> `access_token` + `refresh_token`. Environment variables take precedence over the config file.
 
 ---
 
@@ -126,8 +141,9 @@ Expected output:
 
 ```json
 {
-  "balance": 42.50,
-  "currency": "USD"
+  "available": {
+    "USD": 42.50
+  }
 }
 ```
 

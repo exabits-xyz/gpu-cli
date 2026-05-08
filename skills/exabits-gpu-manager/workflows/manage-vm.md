@@ -6,6 +6,8 @@ List, inspect, start, stop, reboot, and monitor GPU VM instances on Exabits GPU 
 
 Load [../references/cli.md](../references/cli.md) before running any commands.
 
+If MCP is available, prefer `list_gpu_vms`, `get_gpu_vm`, `start_gpu_vm`, `stop_gpu_vm`, `reboot_gpu_vm`, `get_gpu_vm_metrics`, `attach_volumes_to_gpu_vm`, and `detach_volume_from_gpu_vm`. Use CLI commands when MCP is unavailable or the user asks for shell commands.
+
 ---
 
 ## List Instances
@@ -87,6 +89,26 @@ egpu vm metrics <instance-id> --duration 1h
 Valid duration values: `1h` `2h` `4h` `6h` `12h` `1d` `3d` `7d` `15d` `30d`
 
 Omit `--duration` to return all recorded data.
+
+MCP equivalent: call `get_gpu_vm_metrics` with `instance_id` and optional `duration`.
+
+---
+
+## Attach or Detach Volumes
+
+Attach one or more volumes:
+
+```bash
+egpu vm volume attach <vm-id> --volume-ids <volume-id-1>,<volume-id-2>
+```
+
+Detach one volume:
+
+```bash
+egpu vm volume detach <vm-id> <volume-id>
+```
+
+MCP equivalents: `attach_volumes_to_gpu_vm` and `detach_volume_from_gpu_vm`.
 
 ---
 

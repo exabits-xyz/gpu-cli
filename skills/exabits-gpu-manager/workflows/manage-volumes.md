@@ -6,6 +6,8 @@ Create, list, attach, detach, and delete persistent block-storage volumes on Exa
 
 Load [../references/cli.md](../references/cli.md) before running any commands.
 
+If MCP is available, prefer `list_volumes`, `list_regions`, `list_volume_types`, `create_volume`, `attach_volumes_to_gpu_vm`, `detach_volume_from_gpu_vm`, and `delete_volume`. Ask for explicit confirmation before calling `delete_volume`.
+
 ---
 
 ## List Volumes
@@ -21,17 +23,30 @@ Returns all volumes on the account including their IDs, sizes, regions, and atta
 ## Create a Volume
 
 ```bash
-egpu volume create --name <string> --size <int-GB> --region <string>
+egpu region list
+egpu volume type list --region-id <region-id>
+egpu volume create \
+  --display-name <string> \
+  --region-id <region-id> \
+  --type-id <volume-type-id> \
+  --size <int-GB>
 ```
 
-- `--region` must match the region of the VM you intend to attach it to. Cross-region attachment is not supported.
+- `--region-id` must match the region of the VM you intend to attach it to. Cross-region attachment is not supported.
+- `--type-id` comes from `egpu volume type list --region-id <region-id>`.
 - Volumes are billed from creation, not from when they are attached.
 
 Example:
 
 ```bash
-egpu volume create --name dataset-storage --size 500 --region us-east-1
+egpu volume create \
+  --display-name dataset-storage \
+  --region-id <region-id> \
+  --type-id <volume-type-id> \
+  --size 500
 ```
+
+Optional fields: `--image-id` for a bootable volume, `--description`, and `--payment-currency`.
 
 ---
 
@@ -84,7 +99,7 @@ egpu vm volume detach <vm-id> <volume-id>
 Before deleting, confirm the volume is detached:
 
 ```bash
-egpu volume list | jq '.[] | select(.id == "<volume-id>") | .attached_to'
+egpu volume list --filter '[{"key":"id","op":"eq","val":"<volume-id>"}]'
 ```
 
 Delete with `--force`:
