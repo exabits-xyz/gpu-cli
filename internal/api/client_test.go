@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/exabits-xyz/gpu-cli/internal/securestore"
+	"github.com/exabits-xyz/gpu-cli/internal/types"
 	"github.com/spf13/viper"
 )
 
@@ -38,6 +39,65 @@ func TestResolveBaseURLTrimsTrailingSlash(t *testing.T) {
 	got := ResolveBaseURL("https://gpu-api.exascalelabs.ai/")
 	if got != DefaultBaseURL() {
 		t.Fatalf("ResolveBaseURL = %q, want %q", got, DefaultBaseURL())
+	}
+}
+
+func TestGetPagedDecodesModels(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/models" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"status": true,
+			"message": "AI models retrieved successfully",
+			"total": 1,
+			"data": [{
+				"id": "69fef7b5350c9599a3511fdc",
+				"model_name": "MiniMaxAI/MiniMax-M2.7",
+				"display_name": "MiniMaxAI/MiniMax-M2.7",
+				"provider": {"name": "Minimax", "headquarters": "SG"},
+				"hf_repo": "MiniMaxAI/MiniMax-M2.7",
+				"input_tokens_price": {"usd": 0.44574},
+				"output_tokens_price": {"usd": 1.81815},
+				"context_length": 4095,
+				"max_completion_tokens": 4095,
+				"canonical_slug": "minimaxai/minimax-m2.7",
+				"knowledge_cutoff": "2024-06-01T00:00:00Z"
+			}]
+		}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("HOME", t.TempDir())
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("api_url", srv.URL)
+	viper.Set("api_token", "test-token")
+
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	var models []types.Model
+	var total int
+	if err := client.GetPaged("/models", &models, &total); err != nil {
+		t.Fatalf("GetPaged: %v", err)
+	}
+	if total != 1 || len(models) != 1 {
+		t.Fatalf("total = %d, len(models) = %d, want 1 and 1", total, len(models))
+	}
+	m := models[0]
+	if m.ModelName != "MiniMaxAI/MiniMax-M2.7" || m.Provider.Name != "Minimax" {
+		t.Fatalf("model = %+v", m)
+	}
+	if m.InputTokensPrice["usd"] != 0.44574 || m.OutputTokensPrice["usd"] != 1.81815 {
+		t.Fatalf("prices = %v / %v", m.InputTokensPrice, m.OutputTokensPrice)
+	}
+	if m.ContextLength != 4095 || m.CanonicalSlug != "minimaxai/minimax-m2.7" {
+		t.Fatalf("model = %+v", m)
 	}
 }
 

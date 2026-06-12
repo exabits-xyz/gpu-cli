@@ -105,6 +105,20 @@ Waiting for client connection...
 	)
 
 	s.AddTool(
+		mcp.NewTool("list_ai_models",
+			mcp.WithDescription(
+				"Lists AI models available on Exabits GPU Cloud, including pricing per million "+
+					"input/output tokens, provider information, context length, and maximum completion tokens.",
+			),
+			mcp.WithNumber("limit", mcp.Description("Optional maximum number of models to return.")),
+			mcp.WithNumber("offset", mcp.Description("Optional number of models to skip.")),
+			mcp.WithString("sort_field", mcp.Description("Optional sort field, e.g. model_name, context_length.")),
+			mcp.WithString("sort_order", mcp.Description("Optional sort order: asc or desc.")),
+		),
+		handleListAIModels,
+	)
+
+	s.AddTool(
 		mcp.NewTool("list_regions",
 			mcp.WithDescription("Lists all Exabits GPU Cloud datacenter regions. Use these IDs to filter flavors, images, and volume types."),
 		),
@@ -447,6 +461,26 @@ func handleListOSImages(_ context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 	}
 
 	return mcpResultJSON(images)
+}
+
+func handleListAIModels(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	path, err := listPathFromMCPArgs(req, "/models", false)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	client, err := api.NewClient()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	var models []types.Model
+	var total int
+	if err := client.GetPaged(path, &models, &total); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	return mcpResultJSON(types.ModelListResult{Total: total, Data: models})
 }
 
 func handleListRegions(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {

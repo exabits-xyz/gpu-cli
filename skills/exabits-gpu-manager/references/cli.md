@@ -81,6 +81,16 @@ egpu image list [--region-id <region-id>]
 
 `image_id` and `flavor_id` used for VM creation must belong to the same region.
 
+### AI models
+
+List AI models with pricing, provider information, and technical specifications.
+
+```bash
+egpu model list [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-order asc|desc]
+```
+
+Each model includes `id`, `model_name`, `display_name`, `provider`, `hf_repo`, `input_tokens_price` / `output_tokens_price` (per million tokens, keyed by currency), `context_length`, `max_completion_tokens`, `canonical_slug`, and `knowledge_cutoff`.
+
 ---
 
 ## VM Commands
@@ -239,6 +249,7 @@ The MCP server reads the same config and environment variables as the CLI. It wr
 | `list_regions` | `egpu region list` | List datacenter regions |
 | `list_gpu_flavors` | `egpu flavor list` | List GPU flavors; optional `region_id` |
 | `list_os_images` | `egpu image list` | List OS images; optional `region_id` |
+| `list_ai_models` | `egpu model list` | List AI models with `limit`, `offset`, `sort_field`, `sort_order` |
 | `list_gpu_vms` | `egpu vm list` | List VMs with `limit`, `offset`, `sort_field`, `sort_order`, `filter` |
 | `get_gpu_vm` | `egpu vm get` | Get VM details |
 | `create_gpu_vm` | `egpu vm create` | Create VM; supports `init_script` and `wait_for_running` |
