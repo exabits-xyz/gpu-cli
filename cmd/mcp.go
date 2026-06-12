@@ -119,6 +119,46 @@ Waiting for client connection...
 	)
 
 	s.AddTool(
+		mcp.NewTool("chat_completion",
+			mcp.WithDescription(
+				"Sends a chat conversation to an AI model hosted on Exabits GPU Cloud and returns the completion, "+
+					"including the assistant message, optional reasoning content, and token usage. "+
+					"Use list_ai_models first to discover valid model names. Token usage is billed per the model's pricing.",
+			),
+			mcp.WithString("model",
+				mcp.Required(),
+				mcp.Description("Model name — the model_name attribute from list_ai_models."),
+			),
+			mcp.WithString("prompt",
+				mcp.Description("Single user message. Either prompt or messages is required."),
+			),
+			mcp.WithString("system",
+				mcp.Description("Optional system message prepended to the conversation. Only used with prompt."),
+			),
+			mcp.WithArray("messages",
+				mcp.Description(
+					"Full conversation as an array of {role, content} objects. Overrides prompt/system when provided.",
+				),
+				mcp.Items(map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"role":    map[string]any{"type": "string", "description": "Message role, e.g. system, user, assistant"},
+						"content": map[string]any{"type": "string", "description": "Message text"},
+					},
+					"required": []string{"role", "content"},
+				}),
+			),
+			mcp.WithNumber("temperature", mcp.Description("Optional sampling temperature, 0–2.")),
+			mcp.WithNumber("top_p", mcp.Description("Optional nucleus sampling probability mass, 0–1.")),
+			mcp.WithNumber("top_k", mcp.Description("Optional top-K token cutoff, -1–200.")),
+			mcp.WithNumber("presence_penalty", mcp.Description("Optional presence penalty, -2–2.")),
+			mcp.WithNumber("repetition_penalty", mcp.Description("Optional repetition penalty, 0.01–2.")),
+			mcp.WithNumber("max_tokens", mcp.Description("Optional maximum tokens to generate.")),
+		),
+		handleChatCompletion,
+	)
+
+	s.AddTool(
 		mcp.NewTool("list_regions",
 			mcp.WithDescription("Lists all Exabits GPU Cloud datacenter regions. Use these IDs to filter flavors, images, and volume types."),
 		),
@@ -481,6 +521,114 @@ func handleListAIModels(_ context.Context, req mcp.CallToolRequest) (*mcp.CallTo
 	}
 
 	return mcpResultJSON(types.ModelListResult{Total: total, Data: models})
+}
+
+func handleChatCompletion(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	model, err := requireMCPString(req, "model")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	messages, err := chatMessagesFromMCPArgs(req)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	chatReq := types.ChatCompletionRequest{
+		Model:    model,
+		Messages: messages,
+	}
+
+	args := req.GetArguments()
+	if _, ok := args["temperature"]; ok {
+		v, err := req.RequireFloat("temperature")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		chatReq.Temperature = &v
+	}
+	if _, ok := args["top_p"]; ok {
+		v, err := req.RequireFloat("top_p")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		chatReq.TopP = &v
+	}
+	if _, ok := args["top_k"]; ok {
+		v, err := req.RequireInt("top_k")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		chatReq.TopK = &v
+	}
+	if _, ok := args["presence_penalty"]; ok {
+		v, err := req.RequireFloat("presence_penalty")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		chatReq.PresencePenalty = &v
+	}
+	if _, ok := args["repetition_penalty"]; ok {
+		v, err := req.RequireFloat("repetition_penalty")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		chatReq.RepetitionPenalty = &v
+	}
+	if _, ok := args["max_tokens"]; ok {
+		v, err := req.RequireInt("max_tokens")
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		chatReq.MaxTokens = &v
+	}
+
+	client, err := api.NewClient()
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	completion, err := client.ChatCompletion(chatReq)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	return mcpResultJSON(completion)
+}
+
+// chatMessagesFromMCPArgs builds the conversation from either the messages
+// array or the prompt/system shorthand.
+func chatMessagesFromMCPArgs(req mcp.CallToolRequest) ([]types.ChatMessage, error) {
+	args := req.GetArguments()
+
+	if rawMessages, ok := args["messages"].([]any); ok && len(rawMessages) > 0 {
+		messages := make([]types.ChatMessage, 0, len(rawMessages))
+		for i, raw := range rawMessages {
+			obj, ok := raw.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("messages[%d] must be an object with role and content", i)
+			}
+			role, _ := obj["role"].(string)
+			content, _ := obj["content"].(string)
+			if role == "" || content == "" {
+				return nil, fmt.Errorf("messages[%d] must include non-empty role and content strings", i)
+			}
+			messages = append(messages, types.ChatMessage{Role: role, Content: content})
+		}
+		return messages, nil
+	}
+
+	prompt := strings.TrimSpace(req.GetString("prompt", ""))
+	if prompt == "" {
+		return nil, fmt.Errorf("either prompt or a non-empty messages array is required")
+	}
+
+	var messages []types.ChatMessage
+	if system := strings.TrimSpace(req.GetString("system", "")); system != "" {
+		messages = append(messages, types.ChatMessage{Role: "system", Content: system})
+	}
+	messages = append(messages, types.ChatMessage{Role: "user", Content: prompt})
+	return messages, nil
 }
 
 func handleListRegions(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {

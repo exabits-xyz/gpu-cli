@@ -91,6 +91,27 @@ egpu model list [--limit <int>] [--offset <int>] [--sort-field <field>] [--sort-
 
 Each model includes `id`, `model_name`, `display_name`, `provider`, `hf_repo`, `input_tokens_price` / `output_tokens_price` (per million tokens, keyed by currency), `context_length`, `max_completion_tokens`, `canonical_slug`, and `knowledge_cutoff`.
 
+### Chat completions
+
+Send a chat conversation to a hosted AI model. `--model` must be a `model_name` from `egpu model list`. Token usage is billed per the model's pricing.
+
+```bash
+egpu chat --model <model-name> [--system <text>] "<prompt>"
+egpu chat --model <model-name> --messages '<json-array>'
+```
+
+Optional sampling flags: `--temperature` (0–2), `--top-p` (0–1), `--top-k` (-1–200), `--presence-penalty` (-2–2), `--repetition-penalty` (0.01–2), `--max-tokens`.
+
+By default the full completion response (choices, reasoning content, token usage) is printed as JSON. With `--stream`, a TTY gets plain assistant text as it generates; piped stdout gets one JSON chunk per line (NDJSON).
+
+Examples:
+
+```bash
+egpu chat --model MiniMaxAI/MiniMax-M2.7 "hello"
+egpu chat --model MiniMaxAI/MiniMax-M2.7 --system "You are terse." --max-tokens 256 "Summarize SSE in one line"
+egpu chat --model MiniMaxAI/MiniMax-M2.7 --messages '[{"role":"user","content":"hello"}]'
+```
+
 ---
 
 ## VM Commands
@@ -250,6 +271,7 @@ The MCP server reads the same config and environment variables as the CLI. It wr
 | `list_gpu_flavors` | `egpu flavor list` | List GPU flavors; optional `region_id` |
 | `list_os_images` | `egpu image list` | List OS images; optional `region_id` |
 | `list_ai_models` | `egpu model list` | List AI models with `limit`, `offset`, `sort_field`, `sort_order` |
+| `chat_completion` | `egpu chat` | Send a chat conversation to a model; `prompt`+`system` or full `messages` array, plus sampling params |
 | `list_gpu_vms` | `egpu vm list` | List VMs with `limit`, `offset`, `sort_field`, `sort_order`, `filter` |
 | `get_gpu_vm` | `egpu vm get` | Get VM details |
 | `create_gpu_vm` | `egpu vm create` | Create VM; supports `init_script` and `wait_for_running` |
